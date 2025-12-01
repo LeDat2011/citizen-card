@@ -13,13 +13,13 @@ public class citizen extends Applet {
     private static final byte INS_CLEAR_CARD = (byte) 0x18;
     private static final byte INS_UPDATE_CUSTOMER_INFO = (byte) 0x20;
     private static final byte INS_GET_CUSTOMER_INFO = (byte) 0x13;
-    private static final byte INS_GET
-
+    private static final byte INS_GET_BALANCE = (byte) 0x14;
+    private static final byte INS_UPDATE_BALANCE = (byte) 0x16;
     private static final byte INS_UPDATE_CARD_ID = (byte) 0x26;
-    private static final byte INS_GET_CARD_ID = (byt
-            ate static final byte INS_UPDATE_PIN = (byte) 0x21;
-    pr
-
+    private static final byte INS_GET_CARD_ID = (byte) 0x27;
+    private static final byte INS_UPDATE_PIN = (byte) 0x21;
+    private static final byte INS_VERIFY_PIN = (byte) 0x24;
+    private static final byte INS_UNBLOCK_PIN = (byte) 0x25;
     private static final byte INS_CHECK_PIN_STATUS = (byte) 0x28;
     private static final byte INS_UPDATE_PICTURE = (byte) 0x22;
     private static final byte INS_GET_PICTURE = (byte) 0x23;
@@ -32,11 +32,11 @@ public class citizen extends Applet {
     private static final short SW_INVALID_PIN = (short) 0x6302;
     private static final short SW_CARD_LOCKED = (byte) 0x6400;
     private static final short SW_WRONG_LENGTH = (short) 0x6700;
-    private static final short SW_WRONG_DATA = (short) 0x6A8
+    private static final short SW_WRONG_DATA = (short) 0x6A80;
 
     private boolean initialized;
     private byte[] cardId;
-
+    private byte[] customerInfo;
     private byte[] balance;
     private byte[] pin;
     private byte[] picture;
@@ -49,24 +49,22 @@ public class citizen extends Applet {
     private short pictureLength;
 
     private OwnerPIN pinObject;
-    private byte[] pinTriesRemaining; // Lưu số lần thử còn lại (persistent)
+    private byte[] pinTriesRemaining;
     private static final byte MAX_PIN_TRIES = 5;
 
     private citizen() {
-
+        initialized = false;
         cardId = new byte[MAX_CARD_ID_LEN];
         customerInfo = new byte[MAX_CUSTOMER_INFO_LEN];
         balance = new byte[4];
         pin = new byte[MAX_PIN_LEN];
         picture = new byte[MAX_PICTURE_LEN];
+        pictureLength = 0;
 
-    
-        // Khởi tạo OwnerPIN
-
-    
+        pinObject = new OwnerPIN((byte) 5, (byte) 6);
 
         pinTriesRemaining = new byte[1];
-        pinTriesRemaining[0] = MAX_PIN_TRIES; // Bắt đầu với 5 lần thử
+        pinTriesRemaining[0] = MAX_PIN_TRIES;
 
         Util.arrayFillNonAtomic(balance, (short) 0, (short) 4, (byte) 0);
     }
@@ -75,91 +73,91 @@ public class citizen extends Applet {
         new citizen().register(bArray, (short) (bOffset + 1), bArray[bOffset]);
     }
 
-    public void process(AP
+    public void process(APDU apdu) {
+        byte[] buffer = apdu.getBuffer();
 
-        
         if (selectingApplet()) {
-
+            ISOException.throwIt(SW_SUCCESS);
             return;
         }
 
-
+        if (buffer[ISO7816.OFFSET_CLA] != CLA) {
             ISOException.throwIt(ISO7816.SW_CLA_NOT_SUPPORTED);
             return;
         }
 
         byte ins = buffer[ISO7816.OFFSET_INS];
 
-
+        try {
             switch (ins) {
                 case INS_CHECK_CARD_CREATED:
                     checkCardCreated(apdu);
                     break;
 
-
+                case INS_CLEAR_CARD:
                     clearCard(apdu);
                     break;
 
                 case INS_UPDATE_CARD_ID:
-         
+                    updateCardId(apdu);
+                    break;
 
-        
                 case INS_GET_CARD_ID:
                     getCardId(apdu);
-         
+                    break;
 
                 case INS_UPDATE_CUSTOMER_INFO:
-
+                    updateCustomerInfo(apdu);
                     break;
 
                 case INS_GET_CUSTOMER_INFO:
-                    ge
+                    getCustomerInfo(apdu);
+                    break;
 
-            
                 case INS_UPDATE_BALANCE:
-                    up
+                    updateBalance(apdu);
+                    break;
 
-            
                 case INS_GET_BALANCE:
-                    ge
+                    getBalance(apdu);
+                    break;
 
-            
                 case INS_UPDATE_PIN:
-                    up
+                    updatePin(apdu);
+                    break;
 
-            
                 case INS_VERIFY_PIN:
-                    ve
-
+                    verifyPin(apdu);
+                    break;
                 case INS_UNBLOCK_PIN:
                     unblockPin(apdu);
-                    br
-
+                    break;
+                case INS_CHECK_PIN_STATUS:
                     checkPinStatus(apdu);
                     break;
 
-
+                case INS_UPDATE_PICTURE:
                     updatePicture(apdu);
                     break;
 
-
+                case INS_GET_PICTURE:
                     getPicture(apdu);
                     break;
 
-
+                default:
                     ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
             }
-        } catch (ISOEx
-
-            tch (Exception e) {
+        } catch (ISOException e) {
+            throw e;
+        } catch (Exception e) {
             ISOException.throwIt(ISO7816.SW_UNKNOWN);
         }
+    }
 
-            
     private void checkCardCreated(APDU apdu) {
         if (initialized && cardId[0] != 0) {
-     
-
+            ISOException.throwIt(SW_SUCCESS);
+        } else {
             ISOException.throwIt(SW_CARD_NOT_INITIALIZED);
         }
     }
@@ -171,23 +169,21 @@ public class citizen extends Applet {
         Util.arrayFillNonAtomic(pin, (short) 0, (short) pin.length, (byte) 0);
         Util.arrayFillNonAtomic(picture, (short) 0, (short) picture.length, (byte) 0);
         pictureLength = 0;
-
-        i
-
-        
+        initialized = false;
+        pinObject.reset();
+        pinTriesRemaining[0] = MAX_PIN_TRIES;
         ISOException.throwIt(SW_SUCCESS);
     }
 
     private void updateCardId(APDU apdu) {
-     
+        byte[] buffer = apdu.getBuffer();
+        short lc = (short) (buffer[ISO7816.OFFSET_LC] & 0xFF);
 
-    
         if (lc == 0 || lc > MAX_CARD_ID_LEN) {
             ISOException.throwIt(SW_WRONG_LENGTH);
         }
 
         short bytesRead = apdu.setIncomingAndReceive();
-
         Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, cardId, (short) 0, lc);
 
         if (lc < MAX_CARD_ID_LEN) {
@@ -197,8 +193,8 @@ public class citizen extends Applet {
         ISOException.throwIt(SW_SUCCESS);
     }
 
-        ate void getCardId(APDU apdu) {
-     
+    private void getCardId(APDU apdu) {
+        byte[] buffer = apdu.getBuffer();
 
         short len = 0;
         while (len < MAX_CARD_ID_LEN && cardId[len] != 0) {
@@ -207,51 +203,46 @@ public class citizen extends Applet {
 
         if (len == 0) {
             ISOException.throwIt(SW_CARD_NOT_INITIALIZED);
+        }
 
-        
         Util.arrayCopy(cardId, (short) 0, buffer, (short) 0, len);
-        a
+        apdu.setOutgoingAndSend((short) 0, len);
+    }
 
-        
     private void updateCustomerInfo(APDU apdu) {
-
+        byte[] buffer = apdu.getBuffer();
         short lc = (short) (buffer[ISO7816.OFFSET_LC] & 0xFF);
 
-
+        if (lc == 0 || lc > MAX_CUSTOMER_INFO_LEN) {
             ISOException.throwIt(SW_WRONG_LENGTH);
         }
 
-        s
-
+        short bytesRead = apdu.setIncomingAndReceive();
         Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, customerInfo, (short) 0, lc);
 
-
+        if (lc < MAX_CUSTOMER_INFO_LEN) {
             Util.arrayFillNonAtomic(customerInfo, lc, (short) (MAX_CUSTOMER_INFO_LEN - lc), (byte) 0);
         }
 
-        if (cardId[0] != 0) {
-            initialized = true;
-        }
-
+        initialized = true;
         ISOException.throwIt(SW_SUCCESS);
     }
 
     private void getCustomerInfo(APDU apdu) {
-        b
+        byte[] buffer = apdu.getBuffer();
 
         short len = 0;
         while (len < MAX_CUSTOMER_INFO_LEN && customerInfo[len] != 0) {
-         
+            len++;
+        }
 
-        
-        if (len == 0) {
+        if (len > 0) {
+            Util.arrayCopy(customerInfo, (short) 0, buffer, (short) 0, len);
+            apdu.setOutgoingAndSend((short) 0, len);
+        } else {
             ISOException.throwIt(SW_CARD_NOT_INITIALIZED);
-     
-
-        Util.arrayCopy(customerInfo, (short) 0, buffer, (short) 0, len);
-        apdu.setOutgoingAndSend((short) 0, len);
+        }
     }
-     * 
 
     private void updateBalance(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
@@ -262,37 +253,35 @@ public class citizen extends Applet {
         }
 
         short bytesRead = apdu.setIncomingAndReceive();
+        Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, balance, (short) 0, (short) 4);
 
-
-        
         ISOException.throwIt(SW_SUCCESS);
+    }
 
-        
     private void getBalance(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
-
-
+        Util.arrayCopy(balance, (short) 0, buffer, (short) 0, (short) 4);
         apdu.setOutgoingAndSend((short) 0, (short) 4);
     }
 
-    priva
-
+    private void updatePin(APDU apdu) {
+        byte[] buffer = apdu.getBuffer();
         short lc = (short) (buffer[ISO7816.OFFSET_LC] & 0xFF);
 
-
+        if (lc == 0 || lc > MAX_PIN_LEN) {
             ISOException.throwIt(SW_WRONG_LENGTH);
         }
 
         short bytesRead = apdu.setIncomingAndReceive();
 
         if (bytesRead != lc) {
-
+            ISOException.throwIt(SW_WRONG_LENGTH);
         }
 
         Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, pin, (short) 0, lc);
 
-        t
-
+        try {
+            pinObject.update(buffer, ISO7816.OFFSET_CDATA, (byte) lc);
         } catch (Exception e) {
             ISOException.throwIt(SW_WRONG_DATA);
         }
@@ -300,73 +289,62 @@ public class citizen extends Applet {
         ISOException.throwIt(SW_SUCCESS);
     }
 
-    p
-
+    private void verifyPin(APDU apdu) {
+        byte[] buffer = apdu.getBuffer();
         short lc = (short) (buffer[ISO7816.OFFSET_LC] & 0xFF);
-        
-        // Kiểm tra manual counter trước
+
         if (pinTriesRemaining[0] == 0) {
             ISOException.throwIt(SW_CARD_LOCKED);
         }
-        
+
         if (lc > 0) {
             short bytesRead = apdu.setIncomingAndReceive();
-            
+
             if (lc > MAX_PIN_LEN) {
-                // PIN quá dài - giảm counter
                 pinTriesRemaining[0]--;
                 if (pinTriesRemaining[0] == 0) {
                     ISOException.throwIt(SW_CARD_LOCKED);
                 } else {
                     short sw = (short) (0x6300 | (pinTriesRemaining[0] & 0x0F));
                     ISOException.throwIt(sw);
-     
-
+                }
+                return;
             }
-            
-            // Verify PIN với OwnerPIN
+
             boolean isValid = pinObject.check(buffer, ISO7816.OFFSET_CDATA, (byte) lc);
-            
+
             if (isValid) {
-                // PIN đúng - reset counter về 5
                 pinTriesRemaining[0] = MAX_PIN_TRIES;
                 pinObject.reset();
                 ISOException.throwIt(SW_SUCCESS);
             } else {
-                // PIN sai - giảm counter
                 pinTriesRemaining[0]--;
-     
-
+                if (pinTriesRemaining[0] == 0) {
+                    ISOException.throwIt(SW_CARD_LOCKED);
                 } else {
                     short sw = (short) (0x6300 | (pinTriesRemaining[0] & 0x0F));
                     ISOException.throwIt(sw);
                 }
-       
-       }
-    
-    
-    
-    } else {
-
-       if(pnrisRmining[0] == 
-    )
-            ISOException.throwIt(SW_CARD_LOCKE
-     
-
+            }
+        } else {
+            if (pinTriesRemaining[0] == 0) {
+                ISOException.throwIt(SW_CARD_LOCKED);
+            } else {
+                ISOException.throwIt(SW_INVALID_PIN);
+            }
         }
     }
 
-    
-    ate void checkPinStatu(APDU apdu) {
-
-    if (triesRemaining =
-        ISOException.throwIt(SW_CARD_LOCKED);
-    } else {
-
-    }
+    private void checkPinStatus(APDU apdu) {
+        if (pinTriesRemaining[0] == 0) {
+            ISOException.throwIt(SW_CARD_LOCKED);
+        } else {
+            ISOException.throwIt(SW_SUCCESS);
+        }
     }
 
     private void unblockPin(APDU apdu) {
+        pinTriesRemaining[0] = MAX_PIN_TRIES;
         pinObject.reset();
         ISOException.throwIt(SW_SUCCESS);
     }
@@ -379,31 +357,22 @@ public class citizen extends Applet {
             ISOException.throwIt(SW_WRONG_LENGTH);
         }
 
-        Util.arrayFillNonAtomic(picture, (short) 0, (short) picture.length, (byte) 0);
-        pictureLength = 0;
-
-        short bytesReceived = apdu.setIncomingAndReceive();
-        if (bytesReceived != lc) {
-            ISOException.throwIt(SW_WRONG_LENGTH);
-        }
+        short bytesRead = apdu.setIncomingAndReceive();
 
         Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, picture, (short) 0, lc);
-
         pictureLength = lc;
 
         ISOException.throwIt(SW_SUCCESS);
     }
 
-    p
-
-            ISOException.throwIt(SW_CARD_NOT_INITIALIZED);
-        }
-
+    private void getPicture(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
 
-        short lenToSend = (short) ((pictureLength > 256) ? 256 : pictureLength);
-        Util.arrayCopy(picture, (short) 0, buffer, (short) 0, lenToSend);
-        apdu.setOutgoingAndSend((short) 0, lenToSend);
+        if (pictureLength > 0) {
+            Util.arrayCopy(picture, (short) 0, buffer, (short) 0, pictureLength);
+            apdu.setOutgoingAndSend((short) 0, pictureLength);
+        } else {
+            ISOException.throwIt(SW_CARD_NOT_INITIALIZED);
+        }
     }
 }
-
