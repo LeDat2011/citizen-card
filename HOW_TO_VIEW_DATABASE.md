@@ -6,14 +6,10 @@ File database được tạo với tên: **`citizen_card.db`**
 
 **Vị trí hiện tại của file:**
 ```
-D:\citizen_card\desktop\citizen_card.db
+D:\citizen_card\data\citizen_card.db
 ```
 
-File này được tạo ở **thư mục hiện tại khi bạn chạy ứng dụng**. Thông thường sẽ ở một trong các vị trí sau:
-
-1. **Thư mục `desktop/`** - nếu bạn chạy từ thư mục desktop ✅ (vị trí hiện tại)
-2. **Thư mục gốc của project** - nếu bạn chạy từ thư mục root
-3. **Thư mục working directory** của IntelliJ IDEA (thường là thư mục module desktop)
+File này được tạo tự động trong thư mục `data/` ở root của project khi bạn chạy ứng dụng lần đầu.
 
 ## 🔍 Cách tìm file database
 

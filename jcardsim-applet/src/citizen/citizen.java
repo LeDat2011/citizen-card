@@ -33,6 +33,7 @@ public class citizen extends Applet {
     private static final short SW_CARD_LOCKED = (byte) 0x6400;
     private static final short SW_WRONG_LENGTH = (short) 0x6700;
     private static final short SW_WRONG_DATA = (short) 0x6A80;
+    private static final short SW_FILE_NOT_FOUND = (short) 0x6A82;
 
     private boolean initialized;
     private byte[] cardId;
@@ -45,8 +46,11 @@ public class citizen extends Applet {
     private static final short MAX_CUSTOMER_INFO_LEN = 200;
     private static final short MAX_PIN_LEN = 20;
     private static final short MAX_PICTURE_LEN = 5000;
+    private static final short MAX_PICTURE_CHUNK = 200;
 
     private short pictureLength;
+    private boolean pictureReceiving; // Flag to track if we're receiving chunks
+    private short pictureOffset; // Current offset for receiving chunks
 
     private OwnerPIN pinObject;
     private byte[] pinTriesRemaining;
@@ -60,6 +64,8 @@ public class citizen extends Applet {
         pin = new byte[MAX_PIN_LEN];
         picture = new byte[MAX_PICTURE_LEN];
         pictureLength = 0;
+        pictureReceiving = false;
+        pictureOffset = 0;
 
         pinObject = new OwnerPIN((byte) 5, (byte) 6);
         // Set default PIN to "000000"
@@ -172,6 +178,8 @@ public class citizen extends Applet {
         Util.arrayFillNonAtomic(pin, (short) 0, (short) pin.length, (byte) 0);
         Util.arrayFillNonAtomic(picture, (short) 0, (short) picture.length, (byte) 0);
         pictureLength = 0;
+        pictureReceiving = false;
+        pictureOffset = 0;
         initialized = false;
         pinObject.reset();
         pinTriesRemaining[0] = MAX_PIN_TRIES;
@@ -364,16 +372,58 @@ public class citizen extends Applet {
 
     private void updatePicture(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
+        byte p1 = buffer[ISO7816.OFFSET_P1]; // chunkIndex
+        byte p2 = buffer[ISO7816.OFFSET_P2]; // isFinal flag (0x01 = final, 0x00 = not final)
         short lc = (short) (buffer[ISO7816.OFFSET_LC] & 0xFF);
 
-        if (lc == 0 || lc > MAX_PICTURE_LEN) {
+        // If this is the first chunk (chunkIndex = 0), reset picture buffer
+        if (p1 == 0) {
+            Util.arrayFillNonAtomic(picture, (short) 0, (short) picture.length, (byte) 0);
+            pictureLength = 0;
+            pictureOffset = 0;
+            pictureReceiving = true;
+        }
+
+        // Check if we're in the middle of receiving chunks
+        if (!pictureReceiving && p1 != 0) {
+            ISOException.throwIt(SW_WRONG_DATA);
+            return;
+        }
+
+        if (lc == 0) {
+            // Empty chunk - only allowed if it's the final chunk
+            if (p2 == 0x01) {
+                pictureReceiving = false;
+                ISOException.throwIt(SW_SUCCESS);
+            } else {
+                ISOException.throwIt(SW_WRONG_LENGTH);
+            }
+            return;
+        }
+
+        // Check if chunk fits in buffer
+        if (pictureOffset + lc > MAX_PICTURE_LEN) {
+            pictureReceiving = false;
             ISOException.throwIt(SW_WRONG_LENGTH);
+            return;
         }
 
         short bytesRead = apdu.setIncomingAndReceive();
+        if (bytesRead != lc) {
+            pictureReceiving = false;
+            ISOException.throwIt(SW_WRONG_LENGTH);
+            return;
+        }
 
-        Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, picture, (short) 0, lc);
-        pictureLength = lc;
+        // Copy chunk to picture buffer
+        Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, picture, pictureOffset, lc);
+        pictureOffset += lc;
+        pictureLength = pictureOffset;
+
+        // If this is the final chunk, mark receiving as complete
+        if (p2 == 0x01) {
+            pictureReceiving = false;
+        }
 
         ISOException.throwIt(SW_SUCCESS);
     }
@@ -381,11 +431,37 @@ public class citizen extends Applet {
     private void getPicture(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
 
-        if (pictureLength > 0) {
-            Util.arrayCopy(picture, (short) 0, buffer, (short) 0, pictureLength);
-            apdu.setOutgoingAndSend((short) 0, pictureLength);
-        } else {
-            ISOException.throwIt(SW_CARD_NOT_INITIALIZED);
+        if (pictureLength == 0) {
+            ISOException.throwIt(SW_FILE_NOT_FOUND);
+            return;
         }
+
+        // Read P1 and P2 as offset (high byte and low byte)
+        short offset = (short) (((buffer[ISO7816.OFFSET_P1] & 0xFF) << 8) | (buffer[ISO7816.OFFSET_P2] & 0xFF));
+        short le = (short) (buffer[ISO7816.OFFSET_LC] & 0xFF);
+
+        // If no Le specified, use default chunk size
+        if (le == 0) {
+            le = MAX_PICTURE_CHUNK;
+        }
+
+        // Limit Le to available data and max chunk size
+        if (le > MAX_PICTURE_CHUNK) {
+            le = MAX_PICTURE_CHUNK;
+        }
+
+        // Check if offset is valid
+        if (offset >= pictureLength) {
+            ISOException.throwIt(SW_FILE_NOT_FOUND);
+            return;
+        }
+
+        // Calculate how much data we can send
+        short available = (short) (pictureLength - offset);
+        short sendLength = (short) (available < le ? available : le);
+
+        // Copy data to buffer
+        Util.arrayCopy(picture, offset, buffer, (short) 0, sendLength);
+        apdu.setOutgoingAndSend((short) 0, sendLength);
     }
 }

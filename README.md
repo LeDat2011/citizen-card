@@ -1,6 +1,6 @@
 # Hệ thống Quản lý Thẻ Cư dân
 
-Hệ thống quản lý thẻ cư dân sử dụng **javax.smartcardio** để kết nối với **JCIDE terminal**, với backend Java và Desktop app JavaFX.
+Hệ thống quản lý thẻ cư dân sử dụng **javax.smartcardio** để kết nối với **JCIDE terminal**. Desktop app JavaFX tích hợp toàn bộ backend logic (không cần HTTP server riêng).
 
 ## 🏗️ Kiến trúc hệ thống
 
@@ -30,7 +30,7 @@ Hệ thống quản lý thẻ cư dân sử dụng **javax.smartcardio** để k
 └─────────────────────────────────────────┘
               │
               │ javax.smartcardio
-              │ (ISO 7816 T=0)
+              │ (ISO 7816 T=1)
               ▼
 ┌─────────────────────────────────────────┐
 │  JCIDE Terminal                         │
@@ -45,26 +45,52 @@ citizen_card/
 ├── desktop/                    # Desktop application (All-in-one module)
 │   ├── src/main/java/
 │   │   └── com/citizencard/
-│   │       ├── desktop/                # Desktop UI
-│   │       │   ├── MainApp.java        # JavaFX main
-│   │       │   ├── model/              # Desktop data models
-│   │       │   ├── util/               # Utilities (ModelConverter)
-│   │       │   └── ui/                 # UI components
-│   │       └── backend/                # Backend service (integrated)
-│   │           ├── RealCardClient.java # javax.smartcardio client
-│   │           ├── CardService.java   # Xử lý các INS commands
-│   │           ├── dao/                # Data Access Objects
-│   │           ├── database/           # Database manager
-│   │           ├── model/              # Backend data models
-│   │           └── service/            # Business logic
+│   │       ├── app/                   # Application entry point
+│   │       │   └── MainApp.java      # JavaFX main
+│   │       ├── ui/                    # Presentation layer
+│   │       │   ├── views/             # Main views
+│   │       │   │   ├── LoginView.java
+│   │       │   │   ├── ResidentDashboard.java
+│   │       │   │   └── AdminDashboard.java
+│   │       │   └── components/        # Reusable UI components
+│   │       │       ├── PinInputComponent.java
+│   │       │       ├── UITheme.java
+│   │       │       └── NotificationService.java
+│   │       ├── service/               # Business logic layer
+│   │       │   └── CitizenCardService.java
+│   │       ├── dao/                   # Data access layer
+│   │       │   ├── ResidentDAO.java
+│   │       │   ├── TransactionDAO.java
+│   │       │   ├── InvoiceDAO.java
+│   │       │   └── ParkingDAO.java
+│   │       ├── model/                 # Domain models (chỉ 1 bộ)
+│   │       │   ├── Resident.java
+│   │       │   ├── Transaction.java
+│   │       │   ├── Invoice.java
+│   │       │   └── Parking.java
+│   │       ├── card/                  # Smartcard communication layer
+│   │       │   ├── CardService.java   # Xử lý các INS commands
+│   │       │   └── RealCardClient.java # javax.smartcardio client
+│   │       ├── database/              # Database management
+│   │       │   └── DatabaseManager.java
+│   │       ├── validation/            # Validation logic
+│   │       │   └── ValidationService.java
+│   │       └── util/                  # Utilities
+│   │           └── ModelConverter.java
 │   └── pom.xml
-├── jcardsim-applet/            # JavaCard applet cho JCIDE
+├── data/                       # Data files
+│   └── citizen_card.db        # SQLite database (tự động tạo)
+├── jcardsim-applet/           # JavaCard applet cho JCIDE
 │   └── src/citizen/
-│       └── citizen.java        # Applet code
-├── database/
-│   └── schema.sql              # Database schema
+│       └── citizen.java      # Applet code
 └── README.md
 ```
+
+**Lưu ý:**
+- ✅ **Cấu trúc theo chuẩn Layered Architecture** - rõ ràng, dễ maintain
+- ✅ **Chỉ 1 bộ model** - không trùng lặp
+- ✅ Database file `citizen_card.db` nằm trong thư mục `data/`
+- ✅ Tất cả code chạy trong cùng một module, không cần HTTP server
 
 ## 🚀 Hướng dẫn chạy
 
@@ -82,7 +108,7 @@ citizen_card/
 4. **Debug/Run** applet (F11) để mở terminal
 5. **Quan trọng**: Đảm bảo terminal đang mở trong JCIDE
 
-**Lưu ý**: Terminal phải được mở trong JCIDE để Desktop App có thể kết nối.
+**Lưu ý**: Terminal phải được mở trong JCIDE để Desktop App kết nối trực tiếp (không cần JCardSimServer hay server mô phỏng nào khác).
 
 ### Bước 2: Chạy Desktop App
 
@@ -118,12 +144,24 @@ Desktop App sẽ:
 
 ## 📝 Lưu ý về Kiến trúc
 
-Hệ thống sử dụng **Local Communication** - Desktop App gọi trực tiếp Backend service methods trong cùng JVM, không qua HTTP REST API. Điều này giúp:
-- ✅ Không cần HTTP server (port 8080)
+Hệ thống sử dụng **Local Communication** - Desktop App gọi trực tiếp Backend service methods trong cùng JVM, **KHÔNG qua HTTP REST API**. Điều này giúp:
+- ✅ **KHÔNG cần HTTP server** (không cần mở port 8080 hay bất kỳ port nào)
+- ✅ **KHÔNG cần backend server riêng** - tất cả code backend được tích hợp trong desktop module
+- ✅ Desktop App gọi **trực tiếp database** qua DAO classes (không qua API)
 - ✅ Nhanh hơn (không có network overhead)
-- ✅ Đơn giản hơn (direct method calls)
+- ✅ Đơn giản hơn (direct method calls trong cùng JVM)
 
-Kết nối với JCIDE terminal qua **javax.smartcardio** (ISO 7816 T=0 protocol).
+**Kết nối với JCIDE terminal** qua **javax.smartcardio** (ISO 7816 T=1 protocol).
+
+### 🔄 Luồng dữ liệu
+
+```
+Desktop UI → CitizenCardService → DAO Classes → SQLite Database
+                ↓
+         RealCardClient → javax.smartcardio → JCIDE Terminal
+```
+
+**Tất cả đều chạy trong cùng một JVM process, không có network communication.**
 
 ### 💾 Lưu trữ Dữ liệu
 
@@ -133,13 +171,14 @@ Kết nối với JCIDE terminal qua **javax.smartcardio** (ISO 7816 T=0 protoco
 - Dữ liệu chỉ mất khi **reload applet** trong JCIDE
 
 **SQLite Database:**
-- Lưu trong file `citizen_card.db` (persistent)
-- **Không mất** khi restart Desktop App hoặc Backend
+- Lưu trong file `data/citizen_card.db` (persistent)
+- **Không mất** khi restart Desktop App
 - Dữ liệu cư dân, giao dịch, hóa đơn được lưu vĩnh viễn
+- Tự động tạo khi chạy lần đầu (dựa trên `database/schema.sql`)
 
 ### Service Methods
 
-Desktop App gọi trực tiếp các methods trong `CitizenCardService`:
+Desktop App gọi trực tiếp các methods trong `CitizenCardService` (trong cùng module):
 - `loginByCard()` - Đăng nhập bằng thẻ
 - `verifyPin(cardId, pin)` - Xác thực PIN
 - `topUp(cardId, amount)` - Nạp tiền
@@ -147,11 +186,20 @@ Desktop App gọi trực tiếp các methods trong `CitizenCardService`:
 - `initializeCard(...)` - Khởi tạo thẻ (Admin)
 - Và nhiều methods khác...
 
-Xem `backend/src/main/java/com/citizencard/backend/service/CitizenCardService.java` để biết đầy đủ các methods.
+Xem `desktop/src/main/java/com/citizencard/service/CitizenCardService.java` để biết đầy đủ các methods.
+
+### ❓ Tại sao không cần Backend Server?
+
+Vì chạy **hoàn toàn local**, Desktop App có thể:
+- Gọi trực tiếp `CitizenCardService` methods (trong cùng JVM)
+- Truy cập trực tiếp SQLite database qua JDBC (file-based, không cần server)
+- Kết nối trực tiếp với JCIDE terminal qua `javax.smartcardio` (local device)
+
+**Không cần HTTP API** vì không có network communication giữa các components.
 
 ## 📋 INS Commands
 
-Backend sử dụng các INS code sau để giao tiếp với JavaCard applet trong JCIDE:
+`CardService` sử dụng các INS code sau để giao tiếp với JavaCard applet trong JCIDE:
 
 | INS | Chức năng |
 |-----|-----------|
@@ -170,28 +218,27 @@ Backend sử dụng các INS code sau để giao tiếp với JavaCard applet tr
 
 ## 🔐 Protocol
 
-Sử dụng **ISO 7816 T=0** protocol qua `javax.smartcardio`:
+Sử dụng **ISO 7816 T=1** protocol qua `javax.smartcardio`:
 - **SELECT APPLET**: `00 A4 04 00 [AID length] [AID]`
 - **APDU Commands**: `CLA INS P1 P2 [Lc] [Data] [Le]`
 - **Response**: `[Data] SW1 SW2` (0x9000 = success)
 
-Xem file `docs/JCIDE_CONNECTION_GUIDE.md` để biết chi tiết về kết nối với JCIDE terminal.
+Xem file `QUICK_START.md` để biết hướng dẫn nhanh về cách chạy với JCIDE.
 
 ## 📊 Database Schema
 
-Xem file `database/schema.sql` để biết chi tiết cấu trúc database.
+Schema database được lưu trong `desktop/src/main/resources/database/schema.sql` và được tự động load khi khởi tạo database.
 
-## 💻 Chạy Trong IntelliJ IDEA
+## 💻 Tài liệu Hướng dẫn
 
 **Xem file `QUICK_START.md`** để chạy nhanh (3 bước đơn giản)
 
-**Xem file `HOW_TO_RUN_INTELLIJ.md`** để biết hướng dẫn chi tiết:
-- Cấu hình JDK và Maven
-- Tạo Run Configurations
-- Chạy Desktop App với JCIDE terminal
-- Troubleshooting các lỗi thường gặp
+**Xem file `HOW_TO_VIEW_DATABASE.md`** để biết cách xem và quản lý dữ liệu trong SQLite database
 
-**Xem file `docs/JCIDE_APPLET_SETUP.md`** để biết cách setup applet trong JCIDE.
+**Các file hướng dẫn khác:**
+- `HUONG_DAN_KHOI_TAO_THE.md` - Hướng dẫn khởi tạo thẻ
+- `HUONG_DAN_VALIDATION.md` - Hướng dẫn về validation
+- `HUONG_DAN_XAC_DINH_CU_DAN.md` - Hướng dẫn xác định cư dân
 
 ## ❓ Câu Hỏi Thường Gặp
 
@@ -200,19 +247,20 @@ Xem file `database/schema.sql` để biết chi tiết cấu trúc database.
 - ✅ **Nhưng KHÔNG cần chạy Maven commands** - IntelliJ tự động xử lý
 - ✅ **Chỉ cần click Run** - IntelliJ tự động build
 
-### Có cần mở port không?
-- ❌ **KHÔNG cần mở port nào**
+### Có cần mở port hoặc chạy JCardSimServer không?
+- ❌ **KHÔNG cần mở port nào, KHÔNG cần JCardSimServer**
 - ✅ Chỉ cần **JCIDE terminal** (local, không qua network)
 - ✅ Tất cả chạy local trong cùng máy
 
 ## 🐛 Troubleshooting
 
-### Backend không kết nối được JCIDE terminal
+### Desktop App không kết nối được JCIDE terminal
 
 - Kiểm tra JCIDE đang chạy và applet đã được load
-- Kiểm tra terminal đã được mở trong JCIDE
+- Kiểm tra terminal đã được mở trong JCIDE (F11 để mở terminal)
 - Kiểm tra thẻ đã được "insert" vào terminal trong JCIDE
-- Xem `docs/JCIDE_CONNECTION_GUIDE.md` để biết chi tiết
+- Kiểm tra applet đã được SELECT thành công (xem console logs)
+- Đảm bảo sử dụng protocol T=1 (đã được cấu hình sẵn)
 
 ### Desktop app không chạy được
 
@@ -223,7 +271,9 @@ Xem file `database/schema.sql` để biết chi tiết cấu trúc database.
 ### Lỗi database
 
 - Database sẽ tự động tạo khi chạy lần đầu
-- File database: `citizen_card.db` trong thư mục backend
+- File database: `data/citizen_card.db`
+- Nếu cần reset database, xóa file `data/citizen_card.db` và chạy lại app
+- Xem `HOW_TO_VIEW_DATABASE.md` để biết cách xem dữ liệu trong database
 
 ## 📝 License
 

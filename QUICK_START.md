@@ -14,7 +14,7 @@
 - Load applet: `jcardsim-applet/src/citizen/citizen.java`
 - **Build** (Ctrl+B)
 - **Debug/Run** (F11) để mở terminal
-- ✅ **Quan trọng**: Terminal phải đang mở
+- ✅ **Quan trọng**: Terminal phải đang mở (không cần chạy JCardSimServer hay smartcard-client)
 
 ### 3. Chạy Desktop App
 - Trong IntelliJ: **Run → Desktop App** (hoặc `Shift+F10`)
