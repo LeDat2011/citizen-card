@@ -758,7 +758,7 @@ public class AdminDashboard {
 
                 String pin = existingResident != null && existingResident.getPinHash() != null
                         ? existingResident.getPinHash()
-                        : "123456";
+                        : "000000";
 
                 service.updateResidentInfoByAdmin(
                         updatedResident.getId(),

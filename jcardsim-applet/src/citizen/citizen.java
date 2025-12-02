@@ -62,6 +62,9 @@ public class citizen extends Applet {
         pictureLength = 0;
 
         pinObject = new OwnerPIN((byte) 5, (byte) 6);
+        // Set default PIN to "000000"
+        byte[] defaultPin = { (byte) 0x30, (byte) 0x30, (byte) 0x30, (byte) 0x30, (byte) 0x30, (byte) 0x30 };
+        pinObject.update(defaultPin, (short) 0, (byte) 6);
 
         pinTriesRemaining = new byte[1];
         pinTriesRemaining[0] = MAX_PIN_TRIES;
@@ -276,6 +279,16 @@ public class citizen extends Applet {
 
         if (bytesRead != lc) {
             ISOException.throwIt(SW_WRONG_LENGTH);
+        }
+
+        // Security check: new PIN must be different from current PIN
+        // Check if the new PIN matches the current PIN
+        boolean isSameAsOldPin = pinObject.check(buffer, ISO7816.OFFSET_CDATA, (byte) lc);
+        if (isSameAsOldPin) {
+            // Reset the PIN object state after check
+            pinObject.reset();
+            // New PIN is the same as old PIN - reject the change
+            ISOException.throwIt(SW_WRONG_DATA);
         }
 
         Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, pin, (short) 0, lc);

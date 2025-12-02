@@ -179,6 +179,7 @@ public class ResidentDashboard {
         Button transactionsBtn = createMenuButton("📊 Lịch sử giao dịch");
         Button profileBtn = createMenuButton("👤 Thông tin cá nhân");
         Button pictureBtn = createMenuButton("🖼️ Ảnh đại diện");
+        Button changePinBtn = createMenuButton("🔐 Đổi mã PIN");
         Button refreshBtn = createMenuButton("🔄 Làm mới dữ liệu");
 
         Button logoutBtn = new Button("🚪 Đăng xuất");
@@ -229,6 +230,10 @@ public class ResidentDashboard {
             currentPage = "picture";
             showPicturePage(contentArea);
         });
+        changePinBtn.setOnAction(e -> {
+            currentPage = "changepin";
+            showChangePinPage(contentArea);
+        });
         refreshBtn.setOnAction(e -> refreshData());
         logoutBtn.setOnAction(e -> {
             LoginView loginView = new LoginView(stage, service);
@@ -239,7 +244,7 @@ public class ResidentDashboard {
         VBox.setVgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
         sidebar.getChildren().addAll(header, separator, homeBtn, balanceBtn, topupBtn, invoicesBtn,
-                parkingBtn, transactionsBtn, profileBtn, pictureBtn, refreshBtn, spacer, logoutBtn);
+                parkingBtn, transactionsBtn, profileBtn, pictureBtn, changePinBtn, refreshBtn, spacer, logoutBtn);
 
         return sidebar;
     }
@@ -313,6 +318,9 @@ public class ResidentDashboard {
                         break;
                     case "picture":
                         showPicturePage(contentArea);
+                        break;
+                    case "changepin":
+                        showChangePinPage(contentArea);
                         break;
                     default:
                         showHomePage(contentArea);
@@ -1028,6 +1036,110 @@ public class ResidentDashboard {
         grid.add(resultLabel, 0, 12, 2, 1);
 
         formCard.getChildren().addAll(grid, buttonBox);
+        content.getChildren().addAll(title, formCard);
+        contentArea.getChildren().clear();
+        contentArea.getChildren().add(content);
+    }
+
+    private void showChangePinPage(StackPane contentArea) {
+        updatePageTitle("🔐 Đổi mã PIN");
+        VBox content = new VBox(25);
+        content.setPadding(new Insets(50));
+        content.setStyle("-fx-background-color: #f8f9fa;");
+
+        Label title = new Label("🔐 Đổi mã PIN");
+        title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        VBox formCard = new VBox(25);
+        formCard.setPadding(new Insets(40));
+        formCard.setStyle("-fx-background-color: white; -fx-background-radius: 15; " +
+                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 15, 0, 0, 5);");
+        formCard.setMaxWidth(500);
+        formCard.setAlignment(javafx.geometry.Pos.CENTER);
+
+        Label oldPinLabel = new Label("Mã PIN cũ:");
+        oldPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #34495e;");
+
+        final PasswordField oldPinField = createStyledPasswordField("Nhập mã PIN cũ");
+        oldPinField.setPrefWidth(400);
+
+        Label newPinLabel = new Label("Mã PIN mới:");
+        newPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #34495e;");
+
+        final PasswordField newPinField = createStyledPasswordField("Nhập mã PIN mới");
+        newPinField.setPrefWidth(400);
+
+        Label confirmPinLabel = new Label("Xác nhận mã PIN mới:");
+        confirmPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #34495e;");
+
+        final PasswordField confirmPinField = createStyledPasswordField("Nhập lại mã PIN mới");
+        confirmPinField.setPrefWidth(400);
+
+        final Label resultLabel = new Label();
+        resultLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 500;");
+
+        final Button changePinBtn = createPrimaryButton("🔐 Đổi mã PIN", "#3498db");
+        changePinBtn.setPrefWidth(200);
+
+        changePinBtn.setOnAction(e -> {
+            String oldPin = oldPinField.getText();
+            String newPin = newPinField.getText();
+            String confirmPin = confirmPinField.getText();
+
+            // Validate inputs
+            if (oldPin.isEmpty() || newPin.isEmpty() || confirmPin.isEmpty()) {
+                resultLabel.setText("❌ Vui lòng điền đầy đủ thông tin");
+                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                return;
+            }
+
+            if (!newPin.equals(confirmPin)) {
+                resultLabel.setText("❌ Mã PIN mới không khớp");
+                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                return;
+            }
+
+            if (oldPin.equals(newPin)) {
+                resultLabel.setText("❌ Mã PIN mới phải khác mã PIN cũ");
+                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                return;
+            }
+
+            if (newPin.length() < 4 || newPin.length() > 8) {
+                resultLabel.setText("❌ Mã PIN phải có độ dài từ 4-8 ký tự");
+                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                return;
+            }
+
+            try {
+                boolean success = service.changePin(resident.getCardId(), oldPin, newPin);
+                if (success) {
+                    resultLabel.setText("✅ Đổi mã PIN thành công!");
+                    resultLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-size: 14px;");
+                    currentPin = newPin;
+                    oldPinField.clear();
+                    newPinField.clear();
+                    confirmPinField.clear();
+                    showAlert("Thành công", "Mã PIN đã được thay đổi thành công!", Alert.AlertType.INFORMATION);
+                } else {
+                    resultLabel.setText("❌ Không thể đổi mã PIN");
+                    resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                }
+            } catch (Exception ex) {
+                resultLabel.setText("❌ Lỗi: " + ex.getMessage());
+                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+            }
+        });
+
+        VBox fieldsBox = new VBox(15);
+        fieldsBox.setAlignment(javafx.geometry.Pos.CENTER);
+        fieldsBox.getChildren().addAll(
+                oldPinLabel, oldPinField,
+                newPinLabel, newPinField,
+                confirmPinLabel, confirmPinField,
+                changePinBtn, resultLabel);
+
+        formCard.getChildren().addAll(fieldsBox);
         content.getChildren().addAll(title, formCard);
         contentArea.getChildren().clear();
         contentArea.getChildren().add(content);

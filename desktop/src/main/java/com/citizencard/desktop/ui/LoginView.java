@@ -264,27 +264,89 @@ public class LoginView {
         Label pinLabel = new Label("🔑 Mã PIN:");
         pinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #2c3e50;");
 
-        Label hintLabel = new Label("(Sai độ dài hoặc định dạng đều tính là sai)");
+        Label hintLabel = new Label("(Nhập 6 số)");
         hintLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
 
-        PasswordField pinField = new PasswordField();
-        pinField.setPromptText("Nhập PIN");
-        pinField.setStyle("-fx-font-size: 16px; -fx-padding: 10; -fx-background-radius: 8; " +
-                "-fx-border-color: #bdc3c7; -fx-border-radius: 8; " +
-                "-fx-background-color: white;");
-        pinField.setPrefWidth(250);
+        // Container cho 6 ô nhập PIN
+        javafx.scene.layout.HBox pinBox = new javafx.scene.layout.HBox(10);
+        pinBox.setAlignment(Pos.CENTER);
 
-        pinField.focusedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                pinField.setStyle("-fx-font-size: 16px; -fx-padding: 10; -fx-background-radius: 8; " +
-                        "-fx-border-color: #3498db; -fx-border-width: 2; -fx-border-radius: 8; " +
-                        "-fx-background-color: white;");
-            } else {
-                pinField.setStyle("-fx-font-size: 16px; -fx-padding: 10; -fx-background-radius: 8; " +
-                        "-fx-border-color: #bdc3c7; -fx-border-radius: 8; " +
-                        "-fx-background-color: white;");
-            }
-        });
+        PasswordField[] pinFields = new PasswordField[6];
+
+        for (int i = 0; i < 6; i++) {
+            PasswordField pf = new PasswordField();
+            pf.setPrefWidth(45);
+            pf.setPrefHeight(55);
+            pf.setAlignment(Pos.CENTER);
+            String baseStyle = "-fx-font-size: 24px; -fx-font-weight: bold; " +
+                    "-fx-background-color: white; -fx-alignment: center; -fx-padding: 0; " +
+                    "-fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-background-radius: 8;";
+            String activeStyle = "-fx-font-size: 24px; -fx-font-weight: bold; " +
+                    "-fx-background-color: white; -fx-alignment: center; -fx-padding: 0; " +
+                    "-fx-border-color: #3498db; -fx-border-width: 2; -fx-border-radius: 8; -fx-background-radius: 8;";
+            String focusedStyle = activeStyle
+                    + "-fx-effect: dropshadow(three-pass-box, rgba(52,152,219,0.3), 5, 0, 0, 0);";
+
+            pf.setStyle(baseStyle);
+
+            final int index = i;
+
+            // Xử lý nhập liệu: chỉ số, tự động chuyển focus
+            pf.textProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal.length() > 1) {
+                    pf.setText(newVal.substring(0, 1));
+                    return;
+                }
+
+                if (!newVal.matches("\\d*")) {
+                    pf.setText(newVal.replaceAll("[^\\d]", ""));
+                    return;
+                }
+
+                if (!newVal.isEmpty() && index < 5) {
+                    pinFields[index + 1].requestFocus();
+                }
+
+                // Update style based on state
+                if (pf.isFocused()) {
+                    pf.setStyle(focusedStyle);
+                } else if (!newVal.isEmpty()) {
+                    pf.setStyle(activeStyle);
+                } else {
+                    pf.setStyle(baseStyle);
+                }
+            });
+
+            // Xử lý phím Backspace và điều hướng
+            pf.setOnKeyPressed(event -> {
+                if (event.getCode() == javafx.scene.input.KeyCode.BACK_SPACE) {
+                    if (pf.getText().isEmpty() && index > 0) {
+                        pinFields[index - 1].requestFocus();
+                        pinFields[index - 1].setText(""); // Xóa ký tự ở ô trước đó
+                    }
+                } else if (event.getCode() == javafx.scene.input.KeyCode.LEFT && index > 0) {
+                    pinFields[index - 1].requestFocus();
+                } else if (event.getCode() == javafx.scene.input.KeyCode.RIGHT && index < 5) {
+                    pinFields[index + 1].requestFocus();
+                }
+            });
+
+            // Focus style
+            pf.focusedProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal) {
+                    pf.setStyle(focusedStyle);
+                } else {
+                    if (pf.getText().isEmpty()) {
+                        pf.setStyle(baseStyle);
+                    } else {
+                        pf.setStyle(activeStyle);
+                    }
+                }
+            });
+
+            pinFields[i] = pf;
+            pinBox.getChildren().add(pf);
+        }
 
         Label triesLabel = new Label("");
         triesLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #e74c3c; -fx-font-weight: 600;");
@@ -292,7 +354,7 @@ public class LoginView {
         VBox content = new VBox(12);
         content.setPadding(new Insets(20));
         content.setAlignment(Pos.CENTER);
-        content.getChildren().addAll(pinLabel, hintLabel, pinField, triesLabel);
+        content.getChildren().addAll(pinLabel, hintLabel, pinBox, triesLabel);
 
         dialog.getDialogPane().setContent(content);
 
@@ -308,9 +370,16 @@ public class LoginView {
                         "-fx-font-weight: bold; -fx-background-radius: 8; " +
                         "-fx-padding: 8 20; -fx-cursor: hand;");
 
+        // Request focus vào ô đầu tiên khi dialog hiện lên
+        javafx.application.Platform.runLater(() -> pinFields[0].requestFocus());
+
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == loginButtonType) {
-                return pinField.getText();
+                StringBuilder pinBuilder = new StringBuilder();
+                for (PasswordField pf : pinFields) {
+                    pinBuilder.append(pf.getText());
+                }
+                return pinBuilder.toString();
             }
             return null;
         });
