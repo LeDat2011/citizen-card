@@ -33,38 +33,42 @@ public class LoginView {
     public void show() {
         rootLayer = new StackPane();
         rootLayer.setStyle(
-                "-fx-background-color: linear-gradient(to bottom, #020617 0%, #0f172a 40%, #1d1c3b 100%); " +
-                        "-fx-padding: 40;");
+                "-fx-background-color: linear-gradient(135deg, #020617 0%, #0b1224 35%, #0ea5e9 120%); " +
+                        "-fx-padding: 40;" +
+                        "-fx-background-radius: 24;");
 
-        VBox root = new VBox(30);
-        root.setPadding(new Insets(60));
+        VBox root = new VBox(32);
+        root.setPadding(new Insets(68, 60, 68, 60));
         root.setAlignment(Pos.CENTER);
 
         VBox titleBox = new VBox(10);
         titleBox.setAlignment(Pos.CENTER);
 
         Label titleLabel = new Label("🏠 Hệ thống Quản lý Thẻ Cư dân");
-        titleLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold; -fx-text-fill: white; " +
+        titleLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: 800; -fx-text-fill: #f8fafc; " +
                 "-fx-background-color: transparent; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 15, 0, 0, 3);");
+                "-fx-effect: dropshadow(three-pass-box, rgba(14,165,233,0.45), 25, 0, 0, 6);");
 
         Label subtitleLabel = new Label("Citizen Card Management System");
-        subtitleLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: rgba(255,255,255,0.95); " +
+        subtitleLabel.setStyle("-fx-font-size: 17px; -fx-text-fill: rgba(255,255,255,0.9); " +
                 "-fx-background-color: transparent; " +
-                "-fx-font-weight: 500;");
+                "-fx-font-weight: 600;" +
+                "-fx-letter-spacing: 0.3px;");
 
         titleBox.getChildren().addAll(titleLabel, subtitleLabel);
 
-        VBox card = new VBox(25);
-        card.setPadding(new Insets(50));
+        VBox card = new VBox(28);
+        card.setPadding(new Insets(54));
         card.setAlignment(Pos.CENTER);
-        card.setStyle("-fx-background-color: rgba(8,15,32,0.85); -fx-background-radius: 26; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(14,165,233,0.45), 30, 0, 0, 10);");
-        card.setMaxWidth(450);
+        card.setStyle("-fx-background-color: rgba(15,23,42,0.86); -fx-background-radius: 28; " +
+                "-fx-border-radius: 28; -fx-border-color: rgba(255,255,255,0.08); -fx-border-width: 1.2; " +
+                "-fx-effect: dropshadow(three-pass-box, rgba(8,47,73,0.45), 32, 0, 0, 14);" +
+                "-fx-backdrop-filter: blur(12px);");
+        card.setMaxWidth(520);
 
         residentBtn = new Button("👤 Đăng nhập Cư dân");
-        residentBtn.setPrefWidth(350);
-        residentBtn.setPrefHeight(60);
+        residentBtn.setPrefWidth(370);
+        residentBtn.setPrefHeight(64);
         UITheme.applyAccentButton(residentBtn);
 
         // Kiểm tra trạng thái khóa thẻ ngay khi hiển thị màn hình login
@@ -84,8 +88,8 @@ public class LoginView {
         }
 
         Button adminBtn = new Button("🔐 Đăng nhập Admin");
-        adminBtn.setPrefWidth(350);
-        adminBtn.setPrefHeight(60);
+        adminBtn.setPrefWidth(370);
+        adminBtn.setPrefHeight(64);
         UITheme.applyDangerButton(adminBtn);
 
         residentBtn.setOnAction(e -> {

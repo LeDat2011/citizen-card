@@ -39,7 +39,13 @@ public class AdminDashboard {
 
         showHomePage(contentArea);
 
-        Scene scene = new Scene(root, 1400, 900);
+        StackPane rootLayer = new StackPane();
+        rootLayer.setStyle(
+                "-fx-background-color: linear-gradient(135deg, #020617 0%, #0b1224 40%, #0ea5e9 120%); " +
+                        "-fx-padding: 28;");
+        rootLayer.getChildren().add(root);
+
+        Scene scene = new Scene(rootLayer, 1400, 900);
         // Load global CSS
         try {
             String css = getClass().getResource("/css/styles.css").toExternalForm();
@@ -54,13 +60,14 @@ public class AdminDashboard {
     }
 
     private VBox createSidebar() {
-        VBox sidebar = new VBox(8);
-        sidebar.setPadding(new Insets(25));
+        VBox sidebar = new VBox(10);
+        sidebar.setPadding(new Insets(26));
         sidebar.setStyle(
-                "-fx-background-color: #1e293b; " +
-                        "-fx-min-width: 260px; " +
-                        "-fx-border-color: rgba(148,163,184,0.2); " +
-                        "-fx-border-width: 0 1 0 0;");
+                "-fx-background-color: linear-gradient(to bottom right, #0ea5e9 0%, #6366f1 60%, #312e81 100%); " +
+                        "-fx-min-width: 270px; " +
+                        "-fx-border-color: rgba(255,255,255,0.22); " +
+                        "-fx-border-width: 0 1.3 0 0; " +
+                        "-fx-effect: dropshadow(three-pass-box, rgba(59,130,246,0.35), 18, 0, 0, 8);");
 
         VBox header = new VBox(5);
         header.setPadding(new Insets(0, 0, 20, 0));
@@ -118,14 +125,18 @@ public class AdminDashboard {
 
     private void showHomePage(StackPane contentArea) {
         VBox content = new VBox(30);
-        content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setPadding(new Insets(52));
+        content.setStyle(
+                "-fx-background-color: linear-gradient(to bottom, rgba(255,255,255,0.04), rgba(15,23,42,0.65)); " +
+                        "-fx-background-radius: 22;" +
+                        "-fx-effect: dropshadow(three-pass-box, rgba(8,47,73,0.25), 20, 0, 0, 10);");
 
         // Header Card
         VBox headerCard = new VBox(15);
-        headerCard.setPadding(new Insets(30));
-        headerCard.setStyle("-fx-background-color: linear-gradient(to right, #3b82f6 0%, #8b5cf6 100%); " +
-                "-fx-background-radius: 15;");
+        headerCard.setPadding(new Insets(32));
+        headerCard.setStyle("-fx-background-color: linear-gradient(to right, #0ea5e9 0%, #6366f1 60%, #8b5cf6 100%); " +
+                "-fx-background-radius: 20; " +
+                "-fx-effect: dropshadow(three-pass-box, rgba(14,165,233,0.35), 22, 0, 0, 10);");
 
         Label title = new Label("👋 Dashboard Admin");
         title.setStyle("-fx-font-size: 36px; -fx-font-weight: bold; -fx-text-fill: white;");
@@ -156,8 +167,9 @@ public class AdminDashboard {
         card.setPadding(new Insets(30));
         card.setPrefWidth(220);
         String gradient = getGradientForStatColor(color);
-        card.setStyle("-fx-background-color: " + gradient + "; -fx-background-radius: 18; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 15, 0, 0, 4);");
+        card.setStyle("-fx-background-color: " + gradient + "; -fx-background-radius: 20; " +
+                "-fx-border-radius: 20; -fx-border-color: rgba(255,255,255,0.14); -fx-border-width: 1; " +
+                "-fx-effect: dropshadow(three-pass-box, rgba(8,47,73,0.3), 18, 0, 0, 8);");
 
         Label titleLabel = new Label(title);
         titleLabel.setStyle("-fx-font-size: 15px; -fx-text-fill: rgba(255,255,255,0.9); -fx-font-weight: 600;");
@@ -188,7 +200,7 @@ public class AdminDashboard {
     private void showInitCardPage(StackPane contentArea) {
         VBox content = new VBox(25);
         content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(15,23,42,0.9), rgba(6,12,24,0.98));");
 
         // Header
         Label title = new Label("✨ Khởi tạo thẻ mới");
@@ -353,7 +365,7 @@ public class AdminDashboard {
     private void showClearCardPage(StackPane contentArea) {
         VBox content = new VBox(25);
         content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(15,23,42,0.9), rgba(6,12,24,0.98));");
 
         Label title = new Label("🗑️ Xóa thẻ");
         title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
@@ -407,7 +419,7 @@ public class AdminDashboard {
     private void showChangePinPage(StackPane contentArea) {
         VBox content = new VBox(25);
         content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(15,23,42,0.9), rgba(6,12,24,0.98));");
 
         Label title = new Label("🔑 Đổi PIN thẻ");
         title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
@@ -471,7 +483,7 @@ public class AdminDashboard {
     private void showUnblockPinPage(StackPane contentArea) {
         VBox content = new VBox(25);
         content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(15,23,42,0.9), rgba(6,12,24,0.98));");
 
         Label title = new Label("🔓 Mở khóa thẻ");
         title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
@@ -522,7 +534,7 @@ public class AdminDashboard {
     private void showResidentsPage(StackPane contentArea) {
         VBox content = new VBox(20);
         content.setPadding(new Insets(40));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(15,23,42,0.9), rgba(6,12,24,0.98));");
 
         Label title = new Label("Quản lý cư dân");
         title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
@@ -629,9 +641,11 @@ public class AdminDashboard {
         dialog.setTitle("Sửa thông tin cư dân");
         dialog.setHeaderText("Cập nhật thông tin cư dân");
 
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(20));
-        content.setStyle("-fx-background-color: #1e293b;");
+        VBox content = new VBox(12);
+        content.setPadding(new Insets(22));
+        content.setStyle(
+                "-fx-background-color: rgba(15,23,42,0.9); -fx-background-radius: 16; " +
+                        "-fx-border-radius: 16; -fx-border-color: rgba(255,255,255,0.12); -fx-border-width: 1;");
 
         TextField nameField = new TextField(resident.getFullName());
         TextField dobField = new TextField(resident.getDateOfBirth());
@@ -721,7 +735,7 @@ public class AdminDashboard {
     private void showInvoicesPage(StackPane contentArea) {
         VBox content = new VBox(20);
         content.setPadding(new Insets(40));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(15,23,42,0.9), rgba(6,12,24,0.98));");
 
         Label title = new Label("Quản lý hóa đơn");
         title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");
@@ -906,7 +920,7 @@ public class AdminDashboard {
     private void showParkingPage(StackPane contentArea) {
         VBox content = new VBox(20);
         content.setPadding(new Insets(40));
-        content.setStyle("-fx-background-color: #0f172a;");
+        content.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(15,23,42,0.9), rgba(6,12,24,0.98));");
 
         Label title = new Label("Quản lý gửi xe");
         title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #f8fafc;");

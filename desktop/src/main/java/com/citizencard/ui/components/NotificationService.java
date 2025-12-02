@@ -22,40 +22,42 @@ public class NotificationService {
         notification.setPrefHeight(80);
         
         String backgroundColor;
-        String textColor = "white";
+        String textColor = "#f8fafc";
         String icon;
-        
+
         switch (type.toLowerCase()) {
             case "success":
-                backgroundColor = "#27ae60";
+                backgroundColor = "linear-gradient(to right, #22c55e, #16a34a)";
                 icon = "✅ ";
                 break;
             case "error":
-                backgroundColor = "#e74c3c";
+                backgroundColor = "linear-gradient(to right, #ef4444, #b91c1c)";
                 icon = "❌ ";
                 break;
             case "warning":
-                backgroundColor = "#f39c12";
+                backgroundColor = "linear-gradient(to right, #f59e0b, #ea580c)";
                 icon = "⚠️ ";
                 break;
             case "info":
-                backgroundColor = "#3498db";
+                backgroundColor = "linear-gradient(to right, #0ea5e9, #6366f1)";
                 icon = "ℹ️ ";
                 break;
             default:
-                backgroundColor = "#34495e";
+                backgroundColor = "linear-gradient(to right, #1f2937, #0f172a)";
                 icon = "📢 ";
         }
         
         notification.setText(icon + message);
         notification.setStyle(
-            "-fx-background-color: " + backgroundColor + "; " +
-            "-fx-text-fill: " + textColor + "; " +
-            "-fx-font-size: 18px; " +
-            "-fx-font-weight: bold; " +
-            "-fx-padding: 20 40; " +
-            "-fx-background-radius: 15; " +
-            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 20, 0, 0, 8);"
+                "-fx-background-color: " + backgroundColor + "; " +
+                "-fx-text-fill: " + textColor + "; " +
+                "-fx-font-size: 18px; " +
+                "-fx-font-weight: 800; " +
+                "-fx-padding: 20 40; " +
+                "-fx-background-radius: 18; " +
+                "-fx-border-radius: 18; " +
+                "-fx-border-color: rgba(255,255,255,0.18); " +
+                "-fx-effect: dropshadow(three-pass-box, rgba(8,47,73,0.35), 22, 0, 0, 10);"
         );
         
         notification.setOpacity(0);
