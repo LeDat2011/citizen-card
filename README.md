@@ -77,20 +77,21 @@ citizen_card/
 │   │       │   └── ValidationService.java
 │   │       └── util/                  # Utilities
 │   │           └── ModelConverter.java
+│   ├── data/                   # Data files (auto-generated)
+│   │   └── citizen_card.db     # SQLite database
 │   └── pom.xml
-├── data/                       # Data files
-│   └── citizen_card.db        # SQLite database (tự động tạo)
 ├── jcardsim-applet/           # JavaCard applet cho JCIDE
 │   └── src/citizen/
-│       └── citizen.java      # Applet code
+│       └── citizen.java      # Applet code (with RSA encryption)
 └── README.md
 ```
 
 **Lưu ý:**
 - ✅ **Cấu trúc theo chuẩn Layered Architecture** - rõ ràng, dễ maintain
 - ✅ **Chỉ 1 bộ model** - không trùng lặp
-- ✅ Database file `citizen_card.db` nằm trong thư mục `data/`
+- ✅ Database file `citizen_card.db` nằm trong thư mục `desktop/data/`
 - ✅ Tất cả code chạy trong cùng một module, không cần HTTP server
+- 🔐 **Applet hỗ trợ RSA encryption** - Private key được lưu trong thẻ
 
 ## 🚀 Hướng dẫn chạy
 
@@ -171,10 +172,12 @@ Desktop UI → CitizenCardService → DAO Classes → SQLite Database
 - Dữ liệu chỉ mất khi **reload applet** trong JCIDE
 
 **SQLite Database:**
-- Lưu trong file `data/citizen_card.db` (persistent)
+- Lưu trong file `desktop/data/citizen_card.db` (persistent)
 - **Không mất** khi restart Desktop App
 - Dữ liệu cư dân, giao dịch, hóa đơn được lưu vĩnh viễn
 - Tự động tạo khi chạy lần đầu (dựa trên `database/schema.sql`)
+- **Không lưu PIN** - PIN được xác thực trực tiếp bởi thẻ
+- **Lưu Public Key** - để mã hóa dữ liệu gửi đến thẻ
 
 ### Service Methods
 
@@ -213,8 +216,12 @@ Vì chạy **hoàn toàn local**, Desktop App có thể:
 | 26  | UPDATE CARD ID |
 | 27  | GET CARD ID |
 | 21  | UPDATE PIN |
+| 24  | VERIFY PIN |
+| 25  | UNBLOCK PIN |
+| 28  | CHECK PIN STATUS |
 | 22  | UPDATE PICTURE |
 | 23  | GET PICTURE |
+| 2A  | GET PUBLIC KEY (RSA) |
 
 ## 🔐 Protocol
 
@@ -271,8 +278,8 @@ Schema database được lưu trong `desktop/src/main/resources/database/schema.
 ### Lỗi database
 
 - Database sẽ tự động tạo khi chạy lần đầu
-- File database: `data/citizen_card.db`
-- Nếu cần reset database, xóa file `data/citizen_card.db` và chạy lại app
+- File database: `desktop/data/citizen_card.db`
+- Nếu cần reset database, xóa file `desktop/data/citizen_card.db` và chạy lại app
 - Xem `HOW_TO_VIEW_DATABASE.md` để biết cách xem dữ liệu trong database
 
 ## 📝 License

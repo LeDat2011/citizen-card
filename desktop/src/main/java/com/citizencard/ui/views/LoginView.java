@@ -34,8 +34,6 @@ public class LoginView {
         rootLayer = new StackPane();
         rootLayer.setStyle(
                 "-fx-background-color: linear-gradient(to bottom, #020617 0%, #0f172a 40%, #1d1c3b 100%); " +
-                        "-fx-background-image: radial-gradient(circle at 20% 20%, rgba(14,165,233,0.25), transparent 55%), " +
-                        "radial-gradient(circle at 80% 0%, rgba(244,63,94,0.2), transparent 60%); " +
                         "-fx-padding: 40;");
 
         VBox root = new VBox(30);
@@ -47,10 +45,12 @@ public class LoginView {
 
         Label titleLabel = new Label("🏠 Hệ thống Quản lý Thẻ Cư dân");
         titleLabel.setStyle("-fx-font-size: 36px; -fx-font-weight: bold; -fx-text-fill: white; " +
+                "-fx-background-color: transparent; " +
                 "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 15, 0, 0, 3);");
 
         Label subtitleLabel = new Label("Citizen Card Management System");
         subtitleLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: rgba(255,255,255,0.95); " +
+                "-fx-background-color: transparent; " +
                 "-fx-font-weight: 500;");
 
         titleBox.getChildren().addAll(titleLabel, subtitleLabel);
@@ -59,7 +59,6 @@ public class LoginView {
         card.setPadding(new Insets(50));
         card.setAlignment(Pos.CENTER);
         card.setStyle("-fx-background-color: rgba(8,15,32,0.85); -fx-background-radius: 26; " +
-                "-fx-border-color: rgba(248,250,252,0.4); -fx-border-width: 2; -fx-border-radius: 26; " +
                 "-fx-effect: dropshadow(three-pass-box, rgba(14,165,233,0.45), 30, 0, 0, 10);");
         card.setMaxWidth(450);
 
@@ -122,10 +121,20 @@ public class LoginView {
         StackPane.setAlignment(root, Pos.CENTER);
 
         Scene scene = new Scene(rootLayer, 580, 680);
+        scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+
+        // Load global CSS
+        try {
+            String css = getClass().getResource("/css/styles.css").toExternalForm();
+            scene.getStylesheets().add(css);
+        } catch (Exception e) {
+            System.err.println("❌ Error loading CSS: " + e.getMessage());
+        }
+
         stage.setTitle("Đăng nhập - Citizen Card System");
         stage.setScene(scene);
         stage.show();
-        
+
         // Fade in animation
         FadeTransition fadeIn = new FadeTransition(Duration.millis(500), rootLayer);
         fadeIn.setFromValue(0.0);

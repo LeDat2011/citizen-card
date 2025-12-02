@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS residents (
     balance INTEGER DEFAULT 0,
     photo_path TEXT,
     status TEXT DEFAULT 'ACTIVE',
-    pin_hash TEXT,
     public_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -76,14 +75,6 @@ CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices_simple(payment_status
 CREATE INDEX IF NOT EXISTS idx_transactions_resident ON transactions_simple(resident_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_card ON transactions_simple(card_id);
 
--- Migration: add missing columns for legacy databases
-ALTER TABLE residents ADD COLUMN status TEXT DEFAULT 'ACTIVE';
-ALTER TABLE residents ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE residents ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE transactions_simple ADD COLUMN balance_before INTEGER DEFAULT 0;
-ALTER TABLE transactions_simple ADD COLUMN reference_id INTEGER;
-ALTER TABLE residents ADD COLUMN public_key TEXT;
-
 -- TRIGGER đồng bộ số dư
 CREATE TRIGGER IF NOT EXISTS trg_sync_balance
     AFTER INSERT ON transactions_simple
@@ -96,8 +87,8 @@ END;
 -- Seed cư dân mặc định
 INSERT OR IGNORE INTO residents (
     id, card_id, full_name, date_of_birth, room_number,
-    phone_number, email, id_number, balance, pin_hash, photo_path, public_key
+    phone_number, email, id_number, balance, photo_path, public_key
 ) VALUES (
     1, 'CARD001', 'Nguyễn Văn A', '1990-01-01', '101',
-    '0901234567', 'nguyenvana@example.com', '001234567890', 0, '123456', NULL, NULL
+    '0901234567', 'nguyenvana@example.com', '001234567890', 0, NULL, NULL
 );

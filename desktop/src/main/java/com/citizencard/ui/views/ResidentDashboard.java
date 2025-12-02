@@ -142,6 +142,14 @@ public class ResidentDashboard {
 
         rootLayer.getChildren().add(root);
         Scene scene = new Scene(rootLayer, 1200, 820);
+        // Load global CSS
+        try {
+            String css = getClass().getResource("/css/styles.css").toExternalForm();
+            scene.getStylesheets().add(css);
+        } catch (Exception e) {
+            System.err.println("❌ Error loading CSS: " + e.getMessage());
+        }
+
         stage.setTitle("Dashboard Cư dân - " + resident.getFullName());
         stage.setScene(scene);
         stage.show();
@@ -181,11 +189,12 @@ public class ResidentDashboard {
     private VBox createSidebar() {
         VBox sidebar = new VBox(8);
         sidebar.setPadding(new Insets(25));
-        sidebar.setStyle("-fx-background-color: linear-gradient(to bottom right, #667eea 0%, #764ba2 50%, #f093fb 100%); " +
-                "-fx-min-width: 260px; " +
-                "-fx-border-color: rgba(255,255,255,0.3); " +
-                "-fx-border-width: 0 2 0 0; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(102,126,234,0.4), 15, 0, 0, 5);");
+        sidebar.setStyle(
+                "-fx-background-color: linear-gradient(to bottom right, #667eea 0%, #764ba2 50%, #f093fb 100%); " +
+                        "-fx-min-width: 260px; " +
+                        "-fx-border-color: rgba(255,255,255,0.3); " +
+                        "-fx-border-width: 0 2 0 0; " +
+                        "-fx-effect: dropshadow(three-pass-box, rgba(102,126,234,0.4), 15, 0, 0, 5);");
 
         VBox header = new VBox(5);
         header.setPadding(new Insets(0, 0, 20, 0));
@@ -286,7 +295,7 @@ public class ResidentDashboard {
 
         Label roomLabel = new Label("Phòng: " + resident.getRoomNumber());
         roomLabel.setStyle("-fx-font-size: 20px; -fx-text-fill: rgba(255,255,255,0.95); -fx-font-weight: 500;");
-        
+
         welcomeCard.getChildren().addAll(welcomeLabel, roomLabel);
 
         // Hiển thị ảnh đại diện nếu có
@@ -473,7 +482,6 @@ public class ResidentDashboard {
         return btn;
     }
 
-
     private void showInvoicesPage(StackPane contentArea) {
         updatePageTitle("📄 Hóa đơn chưa thanh toán");
         VBox content = new VBox(20);
@@ -484,7 +492,7 @@ public class ResidentDashboard {
 
         TableView<Invoice> table = new TableView<>();
         table.setPrefHeight(400);
-        UITheme.applyTableStyle(table);
+        UITheme.styleTable(table);
 
         TableColumn<Invoice, String> serviceCol = new TableColumn<>("Dịch vụ");
         serviceCol.setCellValueFactory(new PropertyValueFactory<>("serviceName"));
@@ -638,7 +646,7 @@ public class ResidentDashboard {
 
         TableView<Transaction> table = new TableView<>();
         table.setPrefHeight(500);
-        UITheme.applyTableStyle(table);
+        UITheme.styleTable(table);
 
         TableColumn<Transaction, String> typeCol = new TableColumn<>("Loại");
         typeCol.setCellValueFactory(new PropertyValueFactory<>("transactionType"));
@@ -727,7 +735,8 @@ public class ResidentDashboard {
         timestampCol.setCellValueFactory(new PropertyValueFactory<>("timestamp"));
         timestampCol.setPrefWidth(180);
 
-        table.getColumns().setAll(List.of(typeCol, amountCol, balanceBeforeCol, balanceAfterCol, descriptionCol, timestampCol));
+        table.getColumns()
+                .setAll(List.of(typeCol, amountCol, balanceBeforeCol, balanceAfterCol, descriptionCol, timestampCol));
 
         loadTransactions(table);
 

@@ -1,4 +1,4 @@
-﻿package com.citizencard.service;
+package com.citizencard.service;
 
 import com.citizencard.card.CardService;
 import com.citizencard.card.RealCardClient;
