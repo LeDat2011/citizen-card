@@ -122,8 +122,7 @@ public class ResidentDashboard {
         root = new BorderPane();
         contentArea = new StackPane();
         rootLayer = new StackPane();
-        rootLayer.setStyle("-fx-background-color: linear-gradient(to bottom, #020617, #0f172a 45%, #111827 100%); "
-                + "-fx-padding: 25;");
+        rootLayer.getStyleClass().add("root-container");
 
         // Tạo header bar với nút refresh ở góc phải
         HBox headerBar = createHeaderBar();
@@ -158,55 +157,59 @@ public class ResidentDashboard {
     private HBox createHeaderBar() {
         HBox headerBar = new HBox();
         headerBar.setPadding(new Insets(20, 30, 20, 30));
-        headerBar.setStyle("-fx-background-color: linear-gradient(to right, #ffffff, #f8f9fa); " +
-                "-fx-border-color: #e0e0e0; " +
-                "-fx-border-width: 0 0 2 0; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(102,126,234,0.1), 10, 0, 0, 3);");
+        headerBar.getStyleClass().add("header-bar");
         headerBar.setAlignment(Pos.CENTER_LEFT);
         headerBar.setSpacing(20);
 
         // Title label (sẽ được cập nhật khi chuyển trang)
         Label pageTitle = new Label("🏠 Trang chủ");
-        pageTitle.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; " +
-                "-fx-text-fill: linear-gradient(to right, #667eea, #764ba2); " +
-                "-fx-text-fill: #2c3e50;");
-        pageTitle.setId("pageTitle"); // ID để có thể update sau
+        pageTitle.getStyleClass().add("label-title");
+        pageTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: 700;");
+        pageTitle.setId("pageTitle");
 
         // Spacer để đẩy nút refresh sang phải
         Region spacer = new Region();
         HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
+        // User info
+        HBox userInfo = new HBox(10);
+        userInfo.setAlignment(Pos.CENTER_RIGHT);
+        
+        Label userNameLabel = new Label(resident.getFullName());
+        userNameLabel.getStyleClass().add("user-name");
+        userNameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #475569;");
+        
         // Nút refresh ở góc phải
         Button refreshBtn = new Button("🔄 Làm mới");
+        refreshBtn.setPrefHeight(36);
         UITheme.applyPrimaryButton(refreshBtn);
         refreshBtn.setOnAction(e -> refreshData());
 
-        headerBar.getChildren().addAll(pageTitle, spacer, refreshBtn);
+        userInfo.getChildren().addAll(userNameLabel, refreshBtn);
+        headerBar.getChildren().addAll(pageTitle, spacer, userInfo);
 
         return headerBar;
     }
 
     private VBox createSidebar() {
-        VBox sidebar = new VBox(8);
-        sidebar.setPadding(new Insets(25));
-        sidebar.setStyle(
-                "-fx-background-color: linear-gradient(to bottom right, #667eea 0%, #764ba2 50%, #f093fb 100%); " +
-                        "-fx-min-width: 260px; " +
-                        "-fx-border-color: rgba(255,255,255,0.3); " +
-                        "-fx-border-width: 0 2 0 0; " +
-                        "-fx-effect: dropshadow(three-pass-box, rgba(102,126,234,0.4), 15, 0, 0, 5);");
+        VBox sidebar = new VBox();
+        sidebar.getStyleClass().add("sidebar");
 
-        VBox header = new VBox(5);
-        header.setPadding(new Insets(0, 0, 20, 0));
+        // Header với gradient
+        VBox header = new VBox(8);
+        header.getStyleClass().add("sidebar-header");
+        header.setPadding(new Insets(30, 25, 30, 25));
+        
         Label title = new Label("👤 Cư dân");
-        title.setStyle("-fx-text-fill: white; -fx-font-size: 26px; -fx-font-weight: bold; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 8, 0, 0, 2);");
+        title.getStyleClass().add("sidebar-title");
         Label subtitle = new Label("Menu chính");
-        subtitle.setStyle("-fx-text-fill: rgba(255,255,255,0.95); -fx-font-size: 14px; -fx-font-weight: 500;");
+        subtitle.getStyleClass().add("sidebar-subtitle");
         header.getChildren().addAll(title, subtitle);
 
-        Separator separator = new Separator();
-        separator.setStyle("-fx-background-color: rgba(255,255,255,0.3);");
+        // Menu items
+        VBox menu = new VBox(8);
+        menu.getStyleClass().add("sidebar-menu");
+        menu.setPadding(new Insets(20, 15, 20, 15));
 
         Button homeBtn = createMenuButton("🏠 Trang chủ");
         Button balanceBtn = createMenuButton("💰 Số dư");
@@ -217,10 +220,6 @@ public class ResidentDashboard {
         Button profileBtn = createMenuButton("👤 Thông tin cá nhân");
         Button pictureBtn = createMenuButton("🖼️ Ảnh đại diện");
         Button changePinBtn = createMenuButton("🔐 Đổi mã PIN");
-        Button refreshBtn = createMenuButton("🔄 Làm mới dữ liệu");
-
-        Button logoutBtn = new Button("🚪 Đăng xuất");
-        UITheme.applyDangerButton(logoutBtn);
 
         homeBtn.setOnAction(e -> navigateTo("home"));
         balanceBtn.setOnAction(e -> navigateTo("balance"));
@@ -231,17 +230,28 @@ public class ResidentDashboard {
         profileBtn.setOnAction(e -> navigateTo("profile"));
         pictureBtn.setOnAction(e -> navigateTo("picture"));
         changePinBtn.setOnAction(e -> navigateTo("changepin"));
-        refreshBtn.setOnAction(e -> refreshData());
+
+        menu.getChildren().addAll(homeBtn, balanceBtn, topupBtn, invoicesBtn,
+                parkingBtn, transactionsBtn, profileBtn, pictureBtn, changePinBtn);
+
+        // Spacer
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+
+        // Logout button
+        VBox footer = new VBox();
+        footer.setPadding(new Insets(15));
+        Button logoutBtn = new Button("🚪 Đăng xuất");
+        logoutBtn.setPrefWidth(Double.MAX_VALUE);
+        logoutBtn.setPrefHeight(45);
+        UITheme.applyDangerButton(logoutBtn);
         logoutBtn.setOnAction(e -> {
             LoginView loginView = new LoginView(stage, service);
             loginView.show();
         });
+        footer.getChildren().add(logoutBtn);
 
-        VBox spacer = new VBox();
-        VBox.setVgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
-
-        sidebar.getChildren().addAll(header, separator, homeBtn, balanceBtn, topupBtn, invoicesBtn,
-                parkingBtn, transactionsBtn, profileBtn, pictureBtn, changePinBtn, refreshBtn, spacer, logoutBtn);
+        sidebar.getChildren().addAll(header, menu, spacer, footer);
 
         return sidebar;
     }
@@ -279,24 +289,35 @@ public class ResidentDashboard {
 
     private void showHomePage(StackPane contentArea) {
         updatePageTitle("🏠 Trang chủ");
-        VBox content = new VBox(25);
-        content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: linear-gradient(to bottom, #f8f9fa, #ffffff);");
+        VBox content = new VBox(30);
+        content.setPadding(new Insets(40));
+        content.getStyleClass().add("content-area");
+        content.setAlignment(Pos.TOP_CENTER);
 
-        VBox welcomeCard = new VBox(15);
+        // Stats cards row
+        HBox statsRow = new HBox(20);
+        statsRow.setAlignment(Pos.CENTER);
+
+        // Quick stats
+        try {
+            int balance = service.getBalance(resident.getCardId());
+            List<Transaction> pendingInvoices = service.getPendingInvoices(resident.getId());
+            int pendingCount = pendingInvoices != null ? pendingInvoices.size() : 0;
+
+            VBox balanceCard = createStatCard("💰 Số dư", String.format("%,d VND", balance), "#22c55e");
+            VBox invoicesCard = createStatCard("📄 Hóa đơn chưa thanh toán", String.valueOf(pendingCount), "#ef4444");
+            
+            statsRow.getChildren().addAll(balanceCard, invoicesCard);
+        } catch (Exception e) {
+            System.err.println("Error loading stats: " + e.getMessage());
+        }
+
+        // Main welcome card
+        VBox welcomeCard = new VBox(25);
         welcomeCard.setPadding(new Insets(40));
-        welcomeCard.setStyle("-fx-background-color: linear-gradient(to right, #667eea 0%, #764ba2 100%); " +
-                "-fx-background-radius: 20; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(102,126,234,0.4), 20, 0, 0, 5);");
-
-        Label welcomeLabel = new Label("Chào mừng, " + resident.getFullName() + "!");
-        welcomeLabel.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: white; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 2);");
-
-        Label roomLabel = new Label("Phòng: " + resident.getRoomNumber());
-        roomLabel.setStyle("-fx-font-size: 20px; -fx-text-fill: rgba(255,255,255,0.95); -fx-font-weight: 500;");
-
-        welcomeCard.getChildren().addAll(welcomeLabel, roomLabel);
+        welcomeCard.getStyleClass().add("card");
+        welcomeCard.setMaxWidth(700);
+        welcomeCard.setAlignment(Pos.CENTER);
 
         // Hiển thị ảnh đại diện nếu có
         if (resident.getPhotoPath() != null && !resident.getPhotoPath().isEmpty()) {
@@ -304,22 +325,49 @@ public class ResidentDashboard {
                 byte[] imageBytes = Base64.getDecoder().decode(resident.getPhotoPath());
                 Image image = new Image(new java.io.ByteArrayInputStream(imageBytes));
                 ImageView imageView = new ImageView(image);
-                imageView.setFitWidth(220);
-                imageView.setFitHeight(220);
+                imageView.setFitWidth(150);
+                imageView.setFitHeight(150);
                 imageView.setPreserveRatio(true);
-                imageView.setStyle("-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 15, 0, 0, 5);");
+                imageView.setStyle("-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.15), 12, 0, 0, 4);");
                 VBox imageBox = new VBox();
                 imageBox.setAlignment(Pos.CENTER);
+                imageBox.setPadding(new Insets(0, 0, 20, 0));
                 imageBox.getChildren().add(imageView);
-                content.getChildren().add(imageBox);
+                welcomeCard.getChildren().add(imageBox);
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("Error loading photo: " + e.getMessage());
             }
         }
 
-        content.getChildren().addAll(welcomeCard);
+        Label welcomeLabel = new Label("Chào mừng, " + resident.getFullName() + "!");
+        welcomeLabel.getStyleClass().add("label-title");
+        welcomeLabel.setAlignment(Pos.CENTER);
+
+        Label roomLabel = new Label("Phòng: " + (resident.getRoomNumber() != null ? resident.getRoomNumber() : "N/A"));
+        roomLabel.getStyleClass().add("label-subtitle");
+        roomLabel.setAlignment(Pos.CENTER);
+
+        welcomeCard.getChildren().addAll(welcomeLabel, roomLabel);
+
+        content.getChildren().addAll(statsRow, welcomeCard);
         contentArea.getChildren().clear();
         contentArea.getChildren().add(content);
+    }
+
+    private VBox createStatCard(String title, String value, String color) {
+        VBox card = new VBox(12);
+        card.setPadding(new Insets(25));
+        card.getStyleClass().add("stat-card");
+        card.setPrefWidth(280);
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #64748b;");
+
+        Label valueLabel = new Label(value);
+        valueLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: 700; -fx-text-fill: " + color + ";");
+
+        card.getChildren().addAll(titleLabel, valueLabel);
+        return card;
     }
 
     private void showBalancePage(StackPane contentArea) {
@@ -332,19 +380,17 @@ public class ResidentDashboard {
 
         VBox content = new VBox(30);
         content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: linear-gradient(to bottom, #f8f9fa, #ffffff);");
+        content.getStyleClass().add("content-area");
         content.setAlignment(Pos.CENTER);
 
         VBox balanceCard = new VBox(20);
         balanceCard.setPadding(new Insets(50));
         balanceCard.setAlignment(Pos.CENTER);
-        balanceCard.setStyle("-fx-background-color: linear-gradient(to right, #2ecc71, #27ae60, #16a085); " +
-                "-fx-background-radius: 25; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(46,204,113,0.4), 25, 0, 0, 8);");
+        balanceCard.getStyleClass().add("stat-card");
         balanceCard.setMaxWidth(600);
 
         Label title = new Label("💰 Số dư tài khoản");
-        title.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: white;");
+        title.getStyleClass().add("label-title");
 
         int balance = 0;
         try {
@@ -356,8 +402,7 @@ public class ResidentDashboard {
         }
 
         Label balanceLabel = new Label(String.format("%,d", balance) + " VND");
-        balanceLabel.setStyle("-fx-font-size: 48px; -fx-text-fill: white; -fx-font-weight: bold; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 15, 0, 0, 3);");
+        balanceLabel.setStyle("-fx-font-size: 48px; -fx-font-weight: bold; -fx-text-fill: #16a34a;");
 
         balanceCard.getChildren().addAll(title, balanceLabel);
         content.getChildren().addAll(balanceCard);
@@ -369,29 +414,29 @@ public class ResidentDashboard {
         updatePageTitle("💳 Nạp tiền");
         VBox content = new VBox(25);
         content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: #f8f9fa;");
+        content.getStyleClass().add("content-area");
 
         Label title = new Label("💳 Nạp tiền");
-        title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        title.getStyleClass().add("label-title");
 
         VBox formCard = new VBox(25);
         formCard.setPadding(new Insets(40));
-        formCard.setStyle("-fx-background-color: white; -fx-background-radius: 15; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 15, 0, 0, 5);");
+        formCard.getStyleClass().add("card");
         formCard.setMaxWidth(500);
         formCard.setAlignment(javafx.geometry.Pos.CENTER);
 
         Label amountLabel = new Label("Số tiền (VND):");
-        amountLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #34495e;");
 
         // Tạo fields với styled versions ngay từ đầu (final)
-        final TextField amountField = createStyledTextField("Nhập số tiền");
+        final TextField amountField = new TextField();
+        amountField.setPromptText("Nhập số tiền");
+        UITheme.styleTextField(amountField);
         amountField.setPrefWidth(400);
 
         final Label resultLabel = new Label();
-        resultLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 500;");
+        resultLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 500; -fx-text-fill: #475569;");
 
-        final Button topupBtn = createPrimaryButton("💳 Nạp tiền", "#2ecc71");
+        final Button topupBtn = createPrimaryButton("💳 Nạp tiền", "#22c55e");
         topupBtn.setPrefWidth(200);
 
         topupBtn.setOnAction(e -> {
@@ -399,7 +444,7 @@ public class ResidentDashboard {
                 int amount = Integer.parseInt(amountField.getText());
                 if (amount <= 0) {
                     resultLabel.setText("Số tiền phải lớn hơn 0");
-                    resultLabel.setStyle("-fx-text-fill: red;");
+                    resultLabel.getStyleClass().setAll("label", "label-danger");
                     return;
                 }
 
@@ -417,19 +462,19 @@ public class ResidentDashboard {
                     transaction = service.topUp(resident.getCardId(), amount, pin);
                 } catch (Exception ex) {
                     resultLabel.setText("❌ Lỗi: " + ex.getMessage());
-                    resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                    resultLabel.getStyleClass().setAll("label", "label-danger");
                     return;
                 }
 
                 resultLabel.setText("✅ Nạp tiền thành công! Số dư mới: " +
                         String.format("%,d", transaction.getBalanceAfter()) + " VND");
-                resultLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-size: 14px;");
+                resultLabel.getStyleClass().setAll("label", "label-success");
                 amountField.clear();
 
                 resident.setBalance(transaction.getBalanceAfter());
             } catch (NumberFormatException ex) {
                 resultLabel.setText("Vui lòng nhập số hợp lệ");
-                resultLabel.setStyle("-fx-text-fill: red;");
+                resultLabel.getStyleClass().setAll("label", "label-danger");
             }
         });
 
@@ -443,35 +488,15 @@ public class ResidentDashboard {
         contentArea.getChildren().add(content);
     }
 
-    private TextField createStyledTextField(String prompt) {
-        TextField field = new TextField();
-        field.setPromptText(prompt);
-        field.setPrefHeight(40);
-        field.setPrefWidth(300);
-        field.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; " +
-                "-fx-border-radius: 8; -fx-background-radius: 8; " +
-                "-fx-border-width: 1.5; -fx-padding: 10; " +
-                "-fx-font-size: 14px;");
-        field.setOnMouseEntered(e -> field.setStyle(
-                "-fx-background-color: white; -fx-border-color: #3498db; " +
-                        "-fx-border-radius: 8; -fx-background-radius: 8; " +
-                        "-fx-border-width: 2; -fx-padding: 10; " +
-                        "-fx-font-size: 14px;"));
-        field.setOnMouseExited(e -> field.setStyle(
-                "-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; " +
-                        "-fx-border-radius: 8; -fx-background-radius: 8; " +
-                        "-fx-border-width: 1.5; -fx-padding: 10; " +
-                        "-fx-font-size: 14px;"));
-        return field;
-    }
-
     private Button createPrimaryButton(String text, String color) {
         Button btn = new Button(text);
         btn.setPrefHeight(50);
         switch (color) {
+            case "#22c55e":
             case "#2ecc71":
                 UITheme.applyAccentButton(btn);
                 break;
+            case "#ef4444":
             case "#e74c3c":
                 UITheme.applyDangerButton(btn);
                 break;
@@ -488,7 +513,7 @@ public class ResidentDashboard {
         content.setPadding(new Insets(40));
 
         Label title = new Label("Hóa đơn chưa thanh toán");
-        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
+        title.getStyleClass().add("label-title");
 
         TableView<Invoice> table = new TableView<>();
         table.setPrefHeight(400);
@@ -570,13 +595,21 @@ public class ResidentDashboard {
     private void loadPendingInvoices(TableView<Invoice> table) {
         try {
             table.getItems().clear();
+            if (resident == null || resident.getId() == null) {
+                showAlert("Lỗi", "Không thể tải dữ liệu: Thông tin cư dân không hợp lệ", Alert.AlertType.ERROR);
+                return;
+            }
             List<Transaction> backendInvoices = service.getPendingInvoices(resident.getId());
+            if (backendInvoices == null) {
+                return;
+            }
             List<Invoice> desktopInvoices = ModelConverter.transactionsToDesktopInvoices(backendInvoices);
-            if (desktopInvoices != null) {
+            if (desktopInvoices != null && !desktopInvoices.isEmpty()) {
                 table.getItems().addAll(desktopInvoices);
             }
         } catch (Exception e) {
             System.err.println("Error loading invoices: " + e.getMessage());
+            showAlert("Lỗi", "Không thể tải danh sách hóa đơn: " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
 
@@ -601,37 +634,74 @@ public class ResidentDashboard {
 
     private void showParkingPage(StackPane contentArea) {
         updatePageTitle("🚗 Gửi xe");
-        VBox content = new VBox(20);
+        VBox content = new VBox(25);
         content.setPadding(new Insets(40));
+        content.getStyleClass().add("content-area");
 
-        Label title = new Label("Gửi xe");
-        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
+        Label title = new Label("🚗 Gửi xe");
+        title.getStyleClass().add("label-title");
 
+        VBox formCard = new VBox(20);
+        formCard.setPadding(new Insets(40));
+        formCard.getStyleClass().add("card");
+        formCard.setMaxWidth(500);
+        formCard.setAlignment(Pos.CENTER);
+
+        Label licenseLabel = new Label("Biển số xe:");
+        licenseLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #475569;");
+        
         TextField licensePlateField = new TextField();
-        licensePlateField.setPromptText("Biển số xe");
+        licensePlateField.setPromptText("Nhập biển số xe");
+        licensePlateField.setPrefWidth(400);
+        UITheme.styleTextField(licensePlateField);
+
+        Label vehicleLabel = new Label("Loại xe:");
+        vehicleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #475569;");
 
         ComboBox<String> vehicleTypeCombo = new ComboBox<>();
         vehicleTypeCombo.getItems().addAll("MOTORBIKE", "CAR", "BICYCLE");
         vehicleTypeCombo.setValue("MOTORBIKE");
+        vehicleTypeCombo.setPrefWidth(400);
+        UITheme.styleComboBox(vehicleTypeCombo);
 
-        Button registerBtn = new Button("Đăng ký");
+        Label resultLabel = new Label();
+        resultLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #475569;");
+
+        Button registerBtn = new Button("🚗 Đăng ký gửi xe");
+        registerBtn.setPrefWidth(200);
         UITheme.applyPrimaryButton(registerBtn);
 
         registerBtn.setOnAction(e -> {
             try {
+                if (licensePlateField.getText().trim().isEmpty()) {
+                    resultLabel.setText("❌ Vui lòng nhập biển số xe");
+                    resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
+                    return;
+                }
+                
                 // ✅ Gọi trực tiếp service để đăng ký gửi xe
                 service.registerParking(
                         resident.getId(),
                         licensePlateField.getText(),
                         vehicleTypeCombo.getValue());
 
+                resultLabel.setText("✅ Đăng ký gửi xe thành công!");
+                resultLabel.setStyle("-fx-text-fill: #16a34a; -fx-font-size: 14px;");
+                licensePlateField.clear();
                 showAlert("Thành công", "Đăng ký gửi xe thành công!", Alert.AlertType.INFORMATION);
             } catch (Exception ex) {
+                resultLabel.setText("❌ Lỗi: " + ex.getMessage());
+                resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
                 showAlert("Lỗi", "Lỗi đăng ký: " + ex.getMessage(), Alert.AlertType.ERROR);
             }
         });
 
-        content.getChildren().addAll(title, licensePlateField, vehicleTypeCombo, registerBtn);
+        VBox fieldsBox = new VBox(15);
+        fieldsBox.setAlignment(Pos.CENTER);
+        fieldsBox.getChildren().addAll(licenseLabel, licensePlateField, vehicleLabel, vehicleTypeCombo, registerBtn, resultLabel);
+
+        formCard.getChildren().addAll(fieldsBox);
+        content.getChildren().addAll(title, formCard);
         contentArea.getChildren().clear();
         contentArea.getChildren().add(content);
     }
@@ -642,7 +712,7 @@ public class ResidentDashboard {
         content.setPadding(new Insets(40));
 
         Label title = new Label("Lịch sử giao dịch");
-        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
+        title.getStyleClass().add("label-title");
 
         TableView<Transaction> table = new TableView<>();
         table.setPrefHeight(500);
@@ -752,13 +822,21 @@ public class ResidentDashboard {
     private void loadTransactions(TableView<Transaction> table) {
         try {
             table.getItems().clear();
+            if (resident == null || resident.getCardId() == null || resident.getCardId().isEmpty()) {
+                showAlert("Lỗi", "Không thể tải dữ liệu: Card ID không hợp lệ", Alert.AlertType.ERROR);
+                return;
+            }
             List<Transaction> backendTransactions = service.getTransactionHistory(resident.getCardId());
+            if (backendTransactions == null) {
+                return;
+            }
             List<Transaction> desktopTransactions = ModelConverter.toDesktopTransactions(backendTransactions);
-            if (desktopTransactions != null) {
+            if (desktopTransactions != null && !desktopTransactions.isEmpty()) {
                 table.getItems().addAll(desktopTransactions);
             }
         } catch (Exception e) {
             System.err.println("Error loading transactions: " + e.getMessage());
+            showAlert("Lỗi", "Không thể tải lịch sử giao dịch: " + e.getMessage(), Alert.AlertType.ERROR);
         }
     }
 
@@ -766,16 +844,15 @@ public class ResidentDashboard {
         updatePageTitle("👤 Thông tin cá nhân");
         VBox content = new VBox(25);
         content.setPadding(new Insets(40));
-        content.setStyle("-fx-background-color: #f8f9fa;");
+        content.getStyleClass().add("content-area");
 
         Label title = new Label("👤 Thông tin cá nhân");
-        title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        title.getStyleClass().add("label-title");
 
         // Form card
         VBox formCard = new VBox(25);
         formCard.setPadding(new Insets(40));
-        formCard.setStyle("-fx-background-color: white; -fx-background-radius: 15; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 15, 0, 0, 5);");
+        formCard.getStyleClass().add("card");
         formCard.setMaxWidth(600);
 
         GridPane grid = new GridPane();
@@ -785,18 +862,24 @@ public class ResidentDashboard {
 
         // Thông tin cá nhân
         Label infoTitle = new Label("📝 Thông tin cá nhân");
-        infoTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #34495e;");
+        infoTitle.getStyleClass().add("label-subtitle");
         grid.add(infoTitle, 0, 0, 2, 1);
 
-        TextField nameField = createStyledTextField("Họ tên");
-        nameField.setText(resident.getFullName());
-        TextField dobField = createStyledTextField("Ngày sinh");
-        dobField.setText(resident.getDateOfBirth());
-        TextField roomField = createStyledTextField("Số phòng");
-        roomField.setText(resident.getRoomNumber());
-        TextField phoneField = createStyledTextField("Số điện thoại");
-        TextField emailField = createStyledTextField("Email");
-        TextField idNumberField = createStyledTextField("CMND/CCCD");
+        TextField nameField = new TextField(resident.getFullName());
+        UITheme.styleTextField(nameField);
+        TextField dobField = new TextField(resident.getDateOfBirth());
+        UITheme.styleTextField(dobField);
+        TextField roomField = new TextField(resident.getRoomNumber());
+        UITheme.styleTextField(roomField);
+        TextField phoneField = new TextField();
+        phoneField.setPromptText("Số điện thoại");
+        UITheme.styleTextField(phoneField);
+        TextField emailField = new TextField();
+        emailField.setPromptText("Email");
+        UITheme.styleTextField(emailField);
+        TextField idNumberField = new TextField();
+        idNumberField.setPromptText("CMND/CCCD");
+        UITheme.styleTextField(idNumberField);
 
         phoneField.setText(resident.getPhoneNumber() != null ? resident.getPhoneNumber() : "");
         emailField.setText(resident.getEmail() != null ? resident.getEmail() : "");
@@ -816,9 +899,9 @@ public class ResidentDashboard {
         grid.add(idNumberField, 1, 6);
 
         final Label resultLabel = new Label();
-        resultLabel.setStyle("-fx-font-size: 14px;");
+        resultLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #475569;");
 
-        Button saveBtn = createPrimaryButton("💾 Lưu thông tin", "#3498db");
+        Button saveBtn = createPrimaryButton("💾 Lưu thông tin", "#0ea5e9");
 
         HBox buttonBox = new HBox(15);
         buttonBox.getChildren().addAll(saveBtn);
@@ -856,10 +939,10 @@ public class ResidentDashboard {
                 resident = ModelConverter.toDesktopResident(updated);
 
                 resultLabel.setText("✅ Cập nhật thông tin thành công!");
-                resultLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-size: 14px;");
+                resultLabel.setStyle("-fx-text-fill: #16a34a; -fx-font-size: 14px;");
             } catch (Exception ex) {
                 resultLabel.setText("❌ Lỗi: " + ex.getMessage());
-                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
             }
         });
 
@@ -875,37 +958,36 @@ public class ResidentDashboard {
         updatePageTitle("🔐 Đổi mã PIN");
         VBox content = new VBox(25);
         content.setPadding(new Insets(50));
-        content.setStyle("-fx-background-color: #f8f9fa;");
+        content.getStyleClass().add("content-area");
 
         Label title = new Label("🔐 Đổi mã PIN");
-        title.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        title.getStyleClass().add("label-title");
 
         VBox formCard = new VBox(25);
         formCard.setPadding(new Insets(40));
-        formCard.setStyle("-fx-background-color: white; -fx-background-radius: 15; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 15, 0, 0, 5);");
+        formCard.getStyleClass().add("card");
         formCard.setMaxWidth(500);
         formCard.setAlignment(javafx.geometry.Pos.CENTER);
 
         Label oldPinLabel = new Label("Mã PIN cũ:");
-        oldPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #34495e;");
+        oldPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #475569;");
 
         final PinInputComponent oldPinField = new PinInputComponent();
 
         Label newPinLabel = new Label("Mã PIN mới:");
-        newPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #34495e;");
+        newPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #475569;");
 
         final PinInputComponent newPinField = new PinInputComponent();
 
         Label confirmPinLabel = new Label("Xác nhận mã PIN mới:");
-        confirmPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #34495e;");
+        confirmPinLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: #475569;");
 
         final PinInputComponent confirmPinField = new PinInputComponent();
 
         final Label resultLabel = new Label();
-        resultLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 500;");
+        resultLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 500; -fx-text-fill: #475569;");
 
-        final Button changePinBtn = createPrimaryButton("🔐 Đổi mã PIN", "#3498db");
+        final Button changePinBtn = createPrimaryButton("🔐 Đổi mã PIN", "#0ea5e9");
         changePinBtn.setPrefWidth(200);
 
         changePinBtn.setOnAction(e -> {
@@ -916,25 +998,25 @@ public class ResidentDashboard {
             // Validate inputs
             if (oldPin.isEmpty() || newPin.isEmpty() || confirmPin.isEmpty()) {
                 resultLabel.setText("❌ Vui lòng điền đầy đủ thông tin");
-                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
                 return;
             }
 
             if (!newPin.equals(confirmPin)) {
                 resultLabel.setText("❌ Mã PIN mới không khớp");
-                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
                 return;
             }
 
             if (oldPin.equals(newPin)) {
                 resultLabel.setText("❌ Mã PIN mới phải khác mã PIN cũ");
-                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
                 return;
             }
 
             if (newPin.length() < 4 || newPin.length() > 8) {
                 resultLabel.setText("❌ Mã PIN phải có độ dài từ 4-8 ký tự");
-                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
                 return;
             }
 
@@ -942,18 +1024,18 @@ public class ResidentDashboard {
                 boolean success = service.changePin(resident.getCardId(), oldPin, newPin);
                 if (success) {
                     resultLabel.setText("✅ Đổi mã PIN thành công!");
-                    resultLabel.setStyle("-fx-text-fill: #2ecc71; -fx-font-size: 14px;");
+                    resultLabel.setStyle("-fx-text-fill: #16a34a; -fx-font-size: 14px;");
                     oldPinField.clear();
                     newPinField.clear();
                     confirmPinField.clear();
                     showAlert("Thành công", "Mã PIN đã được thay đổi thành công!", Alert.AlertType.INFORMATION);
                 } else {
                     resultLabel.setText("❌ Không thể đổi mã PIN");
-                    resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                    resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
                 }
             } catch (Exception ex) {
                 resultLabel.setText("❌ Lỗi: " + ex.getMessage());
-                resultLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                resultLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px;");
             }
         });
 
@@ -976,7 +1058,7 @@ public class ResidentDashboard {
         content.setPadding(new Insets(40));
 
         Label title = new Label("Ảnh đại diện");
-        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
+        title.getStyleClass().add("label-title");
 
         ImageView imageView = new ImageView();
         imageView.setFitWidth(300);
