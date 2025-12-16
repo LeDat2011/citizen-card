@@ -2,7 +2,7 @@
 
 A smart card-based citizen management system using JavaCard applet and JavaFX desktop application.
 
-## ðŸŒŸ Features
+## Features
 
 - **Smart Card Integration**: JavaCard 2.2.1 applet with AES-128 & RSA-1024 encryption
 - **Desktop Application**: JavaFX-based UI with real-time card communication
@@ -12,82 +12,82 @@ A smart card-based citizen management system using JavaCard applet and JavaFX de
 - **Database Integration**: H2 embedded database for card registry
 - **Inline Validation**: Real-time form validation with user-friendly error messages
 
-## ðŸ—ï¸ Architecture
+## Architecture
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚  Desktop App (JavaFX)                   â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚  â”‚  Controllers (UI Layer)           â”‚  â”‚
-â”‚  â”‚  â””â”€> CardService                  â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â”‚              â”‚                           â”‚
-â”‚              â”‚ javax.smartcardio         â”‚
-â”‚              â”‚ (ISO 7816-4 APDU)         â”‚
-â”‚              â–¼                           â”‚
-â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
-â”‚  â”‚  H2 Database (Embedded)           â”‚  â”‚
-â”‚  â”‚  - Card Registry                  â”‚  â”‚
-â”‚  â”‚  - Transaction Logs               â”‚  â”‚
-â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-              â”‚
-              â”‚ APDU Commands
-              â–¼
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚  JavaCard Applet (Smart Card)          â”‚
-â”‚  - AES-128 Encryption                  â”‚
-â”‚  - RSA-1024 Signatures                 â”‚
-â”‚  - PIN Management                      â”‚
-â”‚  - Photo Storage (8KB)                 â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌─────────────────────────────────────────┐
+│  Desktop App (JavaFX)                   │
+│  ┌───────────────────────────────────┐  │
+│  │  Controllers (UI Layer)           │  │
+│  │  └─> CardService                  │  │
+│  └───────────────────────────────────┘  │
+│              │                           │
+│              │ javax.smartcardio         │
+│              │ (ISO 7816-4 APDU)         │
+│              ▼                           │
+│  ┌───────────────────────────────────┐  │
+│  │  H2 Database (Embedded)           │  │
+│  │  - Card Registry                  │  │
+│  │  - Transaction Logs               │  │
+│  └───────────────────────────────────┘  │
+└─────────────────────────────────────────┘
+              │
+              │ APDU Commands
+              ▼
+┌─────────────────────────────────────────┐
+│  JavaCard Applet (Smart Card)          │
+│  - AES-128 Encryption                  │
+│  - RSA-1024 Signatures                 │
+│  - PIN Management                      │
+│  - Photo Storage (8KB)                 │
+└─────────────────────────────────────────┘
 ```
 
-## ðŸ“¦ Project Structure
+## Project Structure
 
 ```
 citizen_card/
-â”œâ”€â”€ applet/                          # JavaCard Applet
-â”‚   â”œâ”€â”€ src/citizen_applet/
-â”‚   â”‚   â””â”€â”€ citizen_applet.java     # Main applet (749 lines, all-in-one)
-â”‚   â”œâ”€â”€ bin/                         # Compiled .class and .cap files
-â”‚   â””â”€â”€ applet.jcproj               # JCIDE project file
-â”‚
-â”œâ”€â”€ desktop/                         # JavaFX Desktop Application
-â”‚   â”œâ”€â”€ src/main/java/citizencard/
-â”‚   â”‚   â”œâ”€â”€ controller/             # UI Controllers
-â”‚   â”‚   â”‚   â”œâ”€â”€ AdminDashboardController.java
-â”‚   â”‚   â”‚   â”œâ”€â”€ CitizenDashboardController.java
-â”‚   â”‚   â”‚   â”œâ”€â”€ DemoWorkflowController.java
-â”‚   â”‚   â”‚   â”œâ”€â”€ LoginViewController.java
-â”‚   â”‚   â”‚   â””â”€â”€ PhotoManagementController.java
-â”‚   â”‚   â”œâ”€â”€ service/                # Card communication
-â”‚   â”‚   â”‚   â””â”€â”€ CardService.java
-â”‚   â”‚   â”œâ”€â”€ dao/                    # Database access
-â”‚   â”‚   â”‚   â””â”€â”€ CardDAO.java
-â”‚   â”‚   â”œâ”€â”€ model/                  # Data models
-â”‚   â”‚   â””â”€â”€ util/                   # Utilities
-â”‚   â”‚       â”œâ”€â”€ DatabaseViewer.java
-â”‚   â”‚       â”œâ”€â”€ DialogUtils.java
-â”‚   â”‚       â”œâ”€â”€ PhotoUtils.java
-â”‚   â”‚       â””â”€â”€ PinInputDialog.java
-â”‚   â”œâ”€â”€ src/main/resources/
-â”‚   â”‚   â””â”€â”€ css/
-â”‚   â”‚       â””â”€â”€ styles.css          # Unified design system (450 lines)
-â”‚   â”œâ”€â”€ data/                       # H2 Database (auto-generated)
-â”‚   â”‚   â”œâ”€â”€ citizen_card.mv.db
-â”‚   â”‚   â””â”€â”€ citizen_card.trace.db
-â”‚   â””â”€â”€ pom.xml                     # Maven configuration
-â”‚
-â”œâ”€â”€ README.md                        # This file
-â”œâ”€â”€ APPLET_STRUCTURE_GUIDE.md       # Applet architecture reference
-â”œâ”€â”€ APDU_COMMANDS_V2.md             # APDU command reference
-â”œâ”€â”€ DATABASE_VIEWER_GUIDE.md        # Database viewer guide
-â”œâ”€â”€ view-database.bat               # Database viewer (Windows)
-â””â”€â”€ view-database.sh                # Database viewer (Linux/Mac)
+├── applet/                          # JavaCard Applet
+│   ├── src/citizen_applet/
+│   │   └── citizen_applet.java     # Main applet (749 lines, all-in-one)
+│   ├── bin/                         # Compiled .class and .cap files
+│   └── applet.jcproj               # JCIDE project file
+│
+├── desktop/                         # JavaFX Desktop Application
+│   ├── src/main/java/citizencard/
+│   │   ├── controller/             # UI Controllers
+│   │   │   ├── AdminDashboardController.java
+│   │   │   ├── CitizenDashboardController.java
+│   │   │   ├── DemoWorkflowController.java
+│   │   │   ├── LoginViewController.java
+│   │   │   └── PhotoManagementController.java
+│   │   ├── service/                # Card communication
+│   │   │   └── CardService.java
+│   │   ├── dao/                    # Database access
+│   │   │   └── CardDAO.java
+│   │   ├── model/                  # Data models
+│   │   └── util/                   # Utilities
+│   │       ├── DatabaseViewer.java
+│   │       ├── DialogUtils.java
+│   │       ├── PhotoUtils.java
+│   │       └── PinInputDialog.java
+│   ├── src/main/resources/
+│   │   └── css/
+│   │       └── styles.css          # Unified design system (450 lines)
+│   ├── data/                       # H2 Database (auto-generated)
+│   │   ├── citizen_card.mv.db
+│   │   └── citizen_card.trace.db
+│   └── pom.xml                     # Maven configuration
+│
+├── README.md                        # This file
+├── APPLET_STRUCTURE_GUIDE.md       # Applet architecture reference
+├── APDU_COMMANDS_V2.md             # APDU command reference
+├── DATABASE_VIEWER_GUIDE.md        # Database viewer guide
+├── view-database.bat               # Database viewer (Windows)
+└── view-database.sh                # Database viewer (Linux/Mac)
 ```
 
-## ðŸš€ Quick Start
+## Quick Start
 
 ### Prerequisites
 - **Java 17+** (JDK 21 recommended)
@@ -129,7 +129,7 @@ view-database.bat
 ./view-database.sh
 ```
 
-## ðŸ’» Usage
+## Usage
 
 ### Admin Dashboard
 - Register new cards
@@ -143,7 +143,7 @@ view-database.bat
 - View transaction history
 - Update personal information
 
-## 🔐 Security Features
+## Security Features
 
 ### Applet Security
 - **PIN Authentication**: MD5-hashed PIN with 5 retry attempts
@@ -157,7 +157,7 @@ view-database.bat
 - **H2 Database**: Card registry, public keys, transaction logs
 - **No Sensitive Data**: PIN and private keys never stored in database
 
-## ðŸ”§ Technical Details
+## Technical Details
 
 ### JavaCard Applet
 - **Version**: JavaCard 2.2.1
@@ -175,12 +175,12 @@ view-database.bat
 
 ### Communication Protocol
 ```
-Desktop App â†’ javax.smartcardio â†’ APDU Commands â†’ JavaCard Applet
-                                                         â†“
+Desktop App → javax.smartcardio → APDU Commands → JavaCard Applet
+                                                         ↓
                                                    Card Memory
 ```
 
-## ðŸ“‹ APDU Commands
+## APDU Commands
 
 The applet supports the following INS codes (see [APDU_COMMANDS_V2.md](APDU_COMMANDS_V2.md) for details):
 
@@ -199,13 +199,13 @@ The applet supports the following INS codes (see [APDU_COMMANDS_V2.md](APDU_COMM
 | 0x25 | GET_PUBLIC_KEY | Export RSA public key |
 | 0x26 | SIGN_DATA | Create RSA signature |
 
-## ðŸ“š Documentation
+## Documentation
 
 - **[APPLET_STRUCTURE_GUIDE.md](APPLET_STRUCTURE_GUIDE.md)** - Applet architecture and code structure
 - **[APDU_COMMANDS_V2.md](APDU_COMMANDS_V2.md)** - Complete APDU command reference
 - **[DATABASE_VIEWER_GUIDE.md](DATABASE_VIEWER_GUIDE.md)** - Database viewer usage guide
 
-## ðŸ› Troubleshooting
+## Troubleshooting
 
 ### Applet Build Errors
 - Ensure only `citizen_applet.java` exists in `applet/src/citizen_applet/`
@@ -228,22 +228,20 @@ The applet supports the following INS codes (see [APDU_COMMANDS_V2.md](APDU_COMM
 - To reset: Delete database files and restart app
 - See [DATABASE_VIEWER_GUIDE.md](DATABASE_VIEWER_GUIDE.md) for details
 
-## ðŸ¤ Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## ðŸ“„ License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## ðŸ‘¥ Authors
+## Authors
 
 Educational project for learning JavaCard and smart card development.
 
-## ðŸ™ Acknowledgments
+## Acknowledgments
 
 - JavaCard technology by Oracle
 - JavaFX framework
 - H2 Database Engine
-
-
