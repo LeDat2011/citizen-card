@@ -1,0 +1,1877 @@
+// converted by version 1.3
+// on Wed Dec 17 05:57:11 ICT 2025
+
+.package citizen_applet {
+	.aid 0x11:0x22:0x33:0x44:0x55;
+	.version 1.0;
+
+	.imports {
+		0xA0:0x0:0x0:0x0:0x62:0x1:0x1 1.2;		//javacard/framework
+		0xA0:0x0:0x0:0x0:0x62:0x1:0x2 1.2;		//javacard/security
+		0xA0:0x0:0x0:0x0:0x62:0x2:0x1 1.2;		//javacardx/crypto
+	}
+
+	.applet {
+		0x11:0x22:0x33:0x44:0x55:0x0 citizen_applet;
+	}
+
+	.constantPool {
+		// 0
+		instanceFieldRef byte[] citizen_applet/cardId;
+		// 1
+		instanceFieldRef byte[] citizen_applet/pinHash;
+		// 2
+		instanceFieldRef byte[] citizen_applet/encryptedInfo;
+		// 3
+		instanceFieldRef byte[] citizen_applet/avatar;
+		// 4
+		instanceFieldRef byte[] citizen_applet/encryptedBalance;
+		// 5
+		instanceFieldRef byte[] citizen_applet/tempBuffer;
+		// 6
+		instanceFieldRef 1.20 citizen_applet/aesKey;
+		// 7
+		instanceFieldRef 2.1 citizen_applet/aesCipher;
+		// 8
+		instanceFieldRef 1.15 citizen_applet/rsaSignature;
+		// 9
+		instanceFieldRef 1.11 citizen_applet/md5;
+		// 10
+		instanceFieldRef 1.14 citizen_applet/randomGenerator;
+		// 11
+		instanceFieldRef 1.8 citizen_applet/rsaPrivateKey;
+		// 12
+		instanceFieldRef 1.9 citizen_applet/rsaPublicKey;
+		// 13
+		instanceFieldRef boolean citizen_applet/cardInitialized;
+		// 14
+		instanceFieldRef boolean citizen_applet/cardActive;
+		// 15
+		instanceFieldRef byte citizen_applet/pinTryCounter;
+		// 16
+		instanceFieldRef boolean citizen_applet/pinVerified;
+		// 17
+		instanceFieldRef short citizen_applet/encryptedInfoLength;
+		// 18
+		instanceFieldRef short citizen_applet/avatarLength;
+		// 19
+		staticMethodRef 1.14.0(B)Ljavacard/security/RandomData;;		// javacard/security/RandomData.getInstance(B)Ljavacard/security/RandomData;
+			.descriptor	Ljavacard/security/RandomData;	1.14;
+
+		// 20
+		staticMethodRef 1.13.0(BSZ)Ljavacard/security/Key;;		// javacard/security/KeyBuilder.buildKey(BSZ)Ljavacard/security/Key;
+			.descriptor	Ljavacard/security/Key;	1.0;
+
+		// 21
+		classRef 1.16;		// javacard/security/KeyPair
+		// 22
+		staticMethodRef 1.16.0(BS)V;		// javacard/security/KeyPair.<init>(BS)V
+		// 23
+		virtualMethodRef 1.16.1()V;		// javacard/security/KeyPair.genKeyPair()V
+		// 24
+		virtualMethodRef 1.16.2()Ljavacard/security/PrivateKey;;		// javacard/security/KeyPair.getPrivate()Ljavacard/security/PrivateKey;
+			.descriptor	Ljavacard/security/PrivateKey;	1.2;
+
+		// 25
+		classRef 1.8;		// javacard/security/RSAPrivateKey
+		// 26
+		classRef 1.20;		// javacard/security/AESKey
+		// 27
+		virtualMethodRef 1.16.3()Ljavacard/security/PublicKey;;		// javacard/security/KeyPair.getPublic()Ljavacard/security/PublicKey;
+			.descriptor	Ljavacard/security/PublicKey;	1.3;
+
+		// 28
+		classRef 1.9;		// javacard/security/RSAPublicKey
+		// 29
+		virtualMethodRef 0.3.2([BSB)V;		// javacard/framework/Applet.register([BSB)V
+		// 30
+		staticMethodRef 2.1.0(BZ)Ljavacardx/crypto/Cipher;;		// javacardx/crypto/Cipher.getInstance(BZ)Ljavacardx/crypto/Cipher;
+			.descriptor	Ljavacardx/crypto/Cipher;	2.1;
+
+		// 31
+		staticMethodRef 0.3.0()V;		// javacard/framework/Applet.<init>()V
+		// 32
+		staticMethodRef 1.15.0(BZ)Ljavacard/security/Signature;;		// javacard/security/Signature.getInstance(BZ)Ljavacard/security/Signature;
+			.descriptor	Ljavacard/security/Signature;	1.15;
+
+		// 33
+		staticMethodRef citizen_applet/<init>()V;
+		// 34
+		staticMethodRef 1.11.0(BZ)Ljavacard/security/MessageDigest;;		// javacard/security/MessageDigest.getInstance(BZ)Ljavacard/security/MessageDigest;
+			.descriptor	Ljavacard/security/MessageDigest;	1.11;
+
+		// 35
+		classRef citizen_applet;
+		// 36
+		virtualMethodRef 0.3.3()Z;		// javacard/framework/Applet.selectingApplet()Z
+		// 37
+		virtualMethodRef 0.10.1()[B;		// javacard/framework/APDU.getBuffer()[B
+		// 38
+		staticMethodRef 0.7.1(S)V;		// javacard/framework/ISOException.throwIt(S)V
+		// 39
+		staticMethodRef citizen_applet/processVerify(Ljavacard/framework/APDU;BB)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 40
+		staticMethodRef citizen_applet/processCreate(Ljavacard/framework/APDU;BB)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 41
+		staticMethodRef citizen_applet/processGet(Ljavacard/framework/APDU;BB)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 42
+		staticMethodRef citizen_applet/processUpdate(Ljavacard/framework/APDU;BB)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 43
+		staticMethodRef citizen_applet/resetPinTries(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 44
+		staticMethodRef citizen_applet/verifyPin(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 45
+		virtualMethodRef 0.10.6()S;		// javacard/framework/APDU.setIncomingAndReceive()S
+		// 46
+		virtualMethodRef 1.11.4()V;		// javacard/security/MessageDigest.reset()V
+		// 47
+		virtualMethodRef 1.11.1([BSS[BS)S;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+		// 48
+		staticMethodRef 0.16.0([BS[BSS)B;		// javacard/framework/Util.arrayCompare([BS[BSS)B
+		// 49
+		staticMethodRef citizen_applet/generateAesKeyFromPin([BS)V;
+		// 50
+		virtualMethodRef 0.10.8(SS)V;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+		// 51
+		staticMethodRef citizen_applet/initializeCard(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 52
+		staticMethodRef citizen_applet/createAvatar(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 53
+		staticMethodRef citizen_applet/generateCardId()V;
+		// 54
+		staticMethodRef citizen_applet/setBalance(I)V;
+		// 55
+		staticMethodRef 0.16.1([BS[BSS)S;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+		// 56
+		staticMethodRef 0.16.6([BSS)S;		// javacard/framework/Util.setShort([BSS)S
+		// 57
+		staticMethodRef citizen_applet/serializePublicKey(Ljavacard/security/RSAPublicKey;[BS)S;
+			.descriptor	Ljavacard/security/RSAPublicKey;	1.9;
+
+		// 58
+		staticMethodRef citizen_applet/getAvatar(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 59
+		staticMethodRef citizen_applet/getBalance(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 60
+		staticMethodRef citizen_applet/getInfo(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 61
+		staticMethodRef citizen_applet/aesDecode([BSSLjavacard/security/AESKey;[BS)S;
+			.descriptor	Ljavacard/security/AESKey;	1.20;
+
+		// 62
+		staticMethodRef citizen_applet/updatePin(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 63
+		staticMethodRef citizen_applet/updateInfo(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 64
+		staticMethodRef citizen_applet/updateBalance(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 65
+		staticMethodRef citizen_applet/signData(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 66
+		staticMethodRef citizen_applet/activateCard(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 67
+		staticMethodRef citizen_applet/deactivateCard(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 68
+		staticMethodRef citizen_applet/forgetPin(Ljavacard/framework/APDU;)V;
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+		// 69
+		staticMethodRef citizen_applet/aesEncode([BSSLjavacard/security/AESKey;[B)S;
+			.descriptor	Ljavacard/security/AESKey;	1.20;
+
+		// 70
+		staticMethodRef citizen_applet/getInt([BS)I;
+		// 71
+		staticMethodRef citizen_applet/putInt([BSI)V;
+		// 72
+		staticMethodRef citizen_applet/rsaSign(Ljavacard/security/RSAPrivateKey;[BSS[BS)S;
+			.descriptor	Ljavacard/security/RSAPrivateKey;	1.8;
+
+		// 73
+		virtualMethodRef 1.14.1([BSS)V;		// javacard/security/RandomData.generateData([BSS)V
+		// 74
+		staticMethodRef citizen_applet/getHexChar(B)B;
+		// 75
+		virtualMethodRef 1.11.5([BSS)V;		// javacard/security/MessageDigest.update([BSS)V
+		// 76
+		staticMethodRef 0.16.3([BSSB)S;		// javacard/framework/Util.arrayFillNonAtomic([BSSB)S
+		// 77
+		staticMethodRef citizen_applet/applyPadding([BSS)S;
+		// 78
+		virtualMethodRef 2.1.3(Ljavacard/security/Key;B)V;		// javacardx/crypto/Cipher.init(Ljavacard/security/Key;B)V
+			.descriptor	Ljavacard/security/Key;	1.0;
+
+		// 79
+		virtualMethodRef 2.1.1([BSS[BS)S;		// javacardx/crypto/Cipher.doFinal([BSS[BS)S
+		// 80
+		staticMethodRef citizen_applet/removePadding([BS)S;
+		// 81
+		virtualMethodRef 1.15.3(Ljavacard/security/Key;B)V;		// javacard/security/Signature.init(Ljavacard/security/Key;B)V
+			.descriptor	Ljavacard/security/Key;	1.0;
+
+		// 82
+		virtualMethodRef 1.15.5([BSS[BS)S;		// javacard/security/Signature.sign([BSS[BS)S
+	}
+
+	.class public citizen_applet 0 extends 0.3 {		// extends javacard/framework/Applet
+
+		.fields {
+			private byte[] cardId 0;		// [B
+			private byte[] pinHash 1;		// [B
+			private 1.20 aesKey 2;		// Ljavacard/security/AESKey;
+			private 1.8 rsaPrivateKey 3;		// Ljavacard/security/RSAPrivateKey;
+			private 1.9 rsaPublicKey 4;		// Ljavacard/security/RSAPublicKey;
+			private byte[] encryptedInfo 5;		// [B
+			private byte[] avatar 6;		// [B
+			private byte[] encryptedBalance 7;		// [B
+			private 2.1 aesCipher 8;		// Ljavacardx/crypto/Cipher;
+			private 1.15 rsaSignature 9;		// Ljavacard/security/Signature;
+			private 1.11 md5 10;		// Ljavacard/security/MessageDigest;
+			private 1.14 randomGenerator 11;		// Ljavacard/security/RandomData;
+			private byte[] tempBuffer 12;		// [B
+			private boolean cardInitialized 13;		// Z
+			private boolean cardActive 14;		// Z
+			private byte pinTryCounter 15;		// B
+			private boolean pinVerified 16;		// Z
+			private short encryptedInfoLength 17;		// S
+			private short avatarLength 18;		// S
+			private static final byte INS_VERIFY = 0;		// B
+			private static final byte INS_CREATE = 1;		// B
+			private static final byte INS_GET = 2;		// B
+			private static final byte INS_UPDATE = 3;		// B
+			private static final byte INS_RESET_TRY_PIN = 16;		// B
+			private static final byte P1_PIN = 4;		// B
+			private static final byte P1_CITIZEN_INFO = 5;		// B
+			private static final byte P1_SIGNATURE = 6;		// B
+			private static final byte P1_FORGET_PIN = 10;		// B
+			private static final byte P1_ACTIVATE_CARD = 11;		// B
+			private static final byte P1_DEACTIVATE_CARD = 12;		// B
+			private static final byte P2_INFORMATION = 7;		// B
+			private static final byte P2_TRY_REMAINING = 8;		// B
+			private static final byte P2_AVATAR = 9;		// B
+			private static final byte P2_CARD_ID = 10;		// B
+			private static final byte P2_PUBLIC_KEY = 11;		// B
+			private static final byte P2_BALANCE = 12;		// B
+			private static final byte PIN_LENGTH = 4;		// B
+			private static final byte MAX_PIN_TRIES = 5;		// B
+			private static final short CARD_ID_LENGTH = 32;		// S
+			private static final short MAX_INFO_LENGTH = 256;		// S
+			private static final short MAX_AVATAR_SIZE = 8192;		// S
+			private static final short RSA_KEY_LENGTH = 1024;		// S
+		}
+
+		.publicMethodTable 7 {
+			equals(Ljava/lang/Object;)Z;
+			register()V;
+			register([BSB)V;
+			selectingApplet()Z;
+			deselect()V;
+			getShareableInterfaceObject(Ljavacard/framework/AID;B)Ljavacard/framework/Shareable;;
+			select()Z;
+			process(Ljavacard/framework/APDU;)V;
+		}
+
+		.packageMethodTable 0 {
+		}
+
+		.method public static install([BSB)V 0 {
+			.stack 5;
+			.locals 0;
+
+				L0:	new 35;		// citizen_applet/citizen_applet
+					dup;
+					invokespecial 33;		// citizen_applet/citizen_applet.<init>()V
+					aload_0;
+					sload_1;
+					sconst_1;
+					sadd;
+					aload_0;
+					sload_1;
+					baload;
+					invokevirtual 29;		// javacard/framework/Applet.register([BSB)V
+					return;
+		}
+
+		.method protected <init>()V 1 {
+			.stack 4;
+			.locals 1;
+
+				L0:	aload_0;
+					invokespecial 31;		// javacard/framework/Applet.<init>()V
+					aload_0;
+					bspush 32;
+					newarray 11;
+					putfield_a 0;		// reference citizen_applet/citizen_applet.cardId
+					aload_0;
+					bspush 16;
+					newarray 11;
+					putfield_a 1;		// reference citizen_applet/citizen_applet.pinHash
+					aload_0;
+					sspush 272;
+					newarray 11;
+					putfield_a 2;		// reference citizen_applet/citizen_applet.encryptedInfo
+					aload_0;
+					sspush 8192;
+					newarray 11;
+					putfield_a 3;		// reference citizen_applet/citizen_applet.avatar
+					aload_0;
+					bspush 16;
+					newarray 11;
+					putfield_a 4;		// reference citizen_applet/citizen_applet.encryptedBalance
+					aload_0;
+					sspush 256;
+					newarray 11;
+					putfield_a 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					aload_0;
+					bspush 15;
+					sspush 128;
+					sconst_0;
+					invokestatic 20;		// javacard/security/KeyBuilder.buildKey(BSZ)Ljavacard/security/Key;
+					checkcast 0 26;		// T_CLASSORINTERFACE javacard/security/AESKey
+					putfield_a 6;		// reference citizen_applet/citizen_applet.aesKey
+					aload_0;
+					bspush 14;
+					sconst_0;
+					invokestatic 30;		// javacardx/crypto/Cipher.getInstance(BZ)Ljavacardx/crypto/Cipher;
+					putfield_a 7;		// reference citizen_applet/citizen_applet.aesCipher
+					aload_0;
+					bspush 10;
+					sconst_0;
+					invokestatic 32;		// javacard/security/Signature.getInstance(BZ)Ljavacard/security/Signature;
+					putfield_a 8;		// reference citizen_applet/citizen_applet.rsaSignature
+					aload_0;
+					sconst_2;
+					sconst_0;
+					invokestatic 34;		// javacard/security/MessageDigest.getInstance(BZ)Ljavacard/security/MessageDigest;
+					putfield_a 9;		// reference citizen_applet/citizen_applet.md5
+					aload_0;
+					sconst_2;
+					invokestatic 19;		// javacard/security/RandomData.getInstance(B)Ljavacard/security/RandomData;
+					putfield_a 10;		// reference citizen_applet/citizen_applet.randomGenerator
+					new 21;		// javacard/security/KeyPair
+					dup;
+					sconst_1;
+					sspush 1024;
+					invokespecial 22;		// javacard/security/KeyPair.<init>(BS)V
+					astore_1;
+				L1:	aload_1;
+					invokevirtual 23;		// javacard/security/KeyPair.genKeyPair()V
+					aload_0;
+					aload_1;
+					invokevirtual 24;		// javacard/security/KeyPair.getPrivate()Ljavacard/security/PrivateKey;
+					checkcast 0 25;		// T_CLASSORINTERFACE javacard/security/RSAPrivateKey
+					putfield_a 11;		// reference citizen_applet/citizen_applet.rsaPrivateKey
+					aload_0;
+					aload_1;
+					invokevirtual 27;		// javacard/security/KeyPair.getPublic()Ljavacard/security/PublicKey;
+					checkcast 0 28;		// T_CLASSORINTERFACE javacard/security/RSAPublicKey
+					putfield_a 12;		// reference citizen_applet/citizen_applet.rsaPublicKey
+					aload_0;
+					sconst_0;
+					putfield_b 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					aload_0;
+					sconst_0;
+					putfield_b 14;		// boolean citizen_applet/citizen_applet.cardActive
+					aload_0;
+					sconst_5;
+					putfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					aload_0;
+					sconst_0;
+					putfield_b 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					aload_0;
+					sconst_0;
+					putfield_s 17;		// short citizen_applet/citizen_applet.encryptedInfoLength
+					aload_0;
+					sconst_0;
+					putfield_s 18;		// short citizen_applet/citizen_applet.avatarLength
+					return;
+		}
+
+		.method public process(Ljavacard/framework/APDU;)V 7 {
+			.stack 4;
+			.locals 4;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	aload_0;
+					invokevirtual 36;		// javacard/framework/Applet.selectingApplet()Z
+					ifeq L2;
+				L1:	return;
+				L2:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L3:	aload_2;
+					sconst_1;
+					baload;
+					sstore_3;
+				L4:	aload_2;
+					sconst_2;
+					baload;
+					sstore 4;
+				L5:	aload_2;
+					sconst_3;
+					baload;
+					sstore 5;
+				L6:	getfield_b_this 14;		// boolean citizen_applet/citizen_applet.cardActive
+					ifne L12;
+				L7:	sload_3;
+					sconst_1;
+					if_scmpeq L12;
+				L8:	sload_3;
+					sconst_3;
+					if_scmpne L10;
+				L9:	sload 4;
+					bspush 11;
+					if_scmpeq L12;
+				L10:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L12;
+				L11:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L12:	sload_3;
+					slookupswitch L18 5 0 L13 1 L14 2 L15 3 L16 16 L17;
+				L13:	aload_0;
+					aload_1;
+					sload 4;
+					sload 5;
+					invokespecial 39;		// citizen_applet/citizen_applet.processVerify(Ljavacard/framework/APDU;BB)V
+					goto L19;
+				L14:	aload_0;
+					aload_1;
+					sload 4;
+					sload 5;
+					invokespecial 40;		// citizen_applet/citizen_applet.processCreate(Ljavacard/framework/APDU;BB)V
+					goto L19;
+				L15:	aload_0;
+					aload_1;
+					sload 4;
+					sload 5;
+					invokespecial 41;		// citizen_applet/citizen_applet.processGet(Ljavacard/framework/APDU;BB)V
+					goto L19;
+				L16:	aload_0;
+					aload_1;
+					sload 4;
+					sload 5;
+					invokespecial 42;		// citizen_applet/citizen_applet.processUpdate(Ljavacard/framework/APDU;BB)V
+					goto L19;
+				L17:	aload_0;
+					aload_1;
+					invokespecial 43;		// citizen_applet/citizen_applet.resetPinTries(Ljavacard/framework/APDU;)V
+					goto L19;
+				L18:	sspush 27904;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L19:	return;
+		}
+
+		.method private processVerify(Ljavacard/framework/APDU;BB)V {
+			.stack 2;
+			.locals 0;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	sload_2;
+					sconst_4;
+					if_scmpne L2;
+				L1:	aload_0;
+					aload_1;
+					invokespecial 44;		// citizen_applet/citizen_applet.verifyPin(Ljavacard/framework/APDU;)V
+					goto L3;
+				L2:	sspush 27392;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L3:	return;
+		}
+
+		.method private verifyPin(Ljavacard/framework/APDU;)V {
+			.stack 6;
+			.locals 3;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifne L2;
+				L1:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	getfield_b_this 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					ifne L4;
+				L3:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L4:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L5:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L6:	sload_3;
+					sconst_4;
+					if_scmpeq L8;
+				L7:	sspush 26368;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L8:	bspush 16;
+					newarray 11;
+					astore 4;
+				L9:	getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					invokevirtual 46;		// javacard/security/MessageDigest.reset()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload_2;
+					sconst_5;
+					sconst_4;
+					aload 4;
+					sconst_0;
+					invokevirtual 47;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+					pop;
+					getfield_a_this 1;		// reference citizen_applet/citizen_applet.pinHash
+					sconst_0;
+					aload 4;
+					sconst_0;
+					bspush 16;
+					invokestatic 48;		// javacard/framework/Util.arrayCompare([BS[BSS)B
+					ifne L11;
+				L10:	aload_0;
+					sconst_1;
+					putfield_b 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					aload_0;
+					sconst_5;
+					putfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					aload_0;
+					aload_2;
+					sconst_5;
+					invokespecial 49;		// citizen_applet/citizen_applet.generateAesKeyFromPin([BS)V
+					aload_2;
+					sconst_0;
+					sconst_1;
+					bastore;
+					aload_2;
+					sconst_1;
+					getfield_b_this 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_2;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					goto L13;
+				L11:	aload_0;
+					dup;
+					getfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					sconst_1;
+					ssub;
+					s2b;
+					putfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					aload_0;
+					sconst_0;
+					putfield_b 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					aload_2;
+					sconst_0;
+					sconst_0;
+					bastore;
+					aload_2;
+					sconst_1;
+					getfield_b_this 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_2;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					getfield_b_this 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					ifne L13;
+				L12:	aload_0;
+					sconst_0;
+					putfield_b 14;		// boolean citizen_applet/citizen_applet.cardActive
+				L13:	return;
+		}
+
+		.method private processCreate(Ljavacard/framework/APDU;BB)V {
+			.stack 2;
+			.locals 0;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	sload_2;
+					sconst_4;
+					if_scmpne L2;
+				L1:	aload_0;
+					aload_1;
+					invokespecial 51;		// citizen_applet/citizen_applet.initializeCard(Ljavacard/framework/APDU;)V
+					goto L6;
+				L2:	sload_2;
+					sconst_5;
+					if_scmpne L5;
+				L3:	sload_3;
+					bspush 9;
+					if_scmpne L5;
+				L4:	aload_0;
+					aload_1;
+					invokespecial 52;		// citizen_applet/citizen_applet.createAvatar(Ljavacard/framework/APDU;)V
+					goto L6;
+				L5:	sspush 27392;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L6:	return;
+		}
+
+		.method private initializeCard(Ljavacard/framework/APDU;)V {
+			.stack 6;
+			.locals 2;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L2;
+				L1:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L3:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L4:	sload_3;
+					sconst_4;
+					if_scmpge L6;
+				L5:	sspush 26368;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L6:	aload_0;
+					invokespecial 53;		// citizen_applet/citizen_applet.generateCardId()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					invokevirtual 46;		// javacard/security/MessageDigest.reset()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload_2;
+					sconst_5;
+					sconst_4;
+					getfield_a_this 1;		// reference citizen_applet/citizen_applet.pinHash
+					sconst_0;
+					invokevirtual 47;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+					pop;
+					aload_0;
+					aload_2;
+					sconst_5;
+					invokespecial 49;		// citizen_applet/citizen_applet.generateAesKeyFromPin([BS)V
+					aload_0;
+					iconst_0;
+					invokespecial 54;		// citizen_applet/citizen_applet.setBalance(I)V
+					aload_0;
+					sconst_1;
+					putfield_b 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					aload_0;
+					sconst_1;
+					putfield_b 14;		// boolean citizen_applet/citizen_applet.cardActive
+					aload_0;
+					sconst_5;
+					putfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					aload_0;
+					sconst_1;
+					putfield_b 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					getfield_a_this 0;		// reference citizen_applet/citizen_applet.cardId
+					sconst_0;
+					aload_2;
+					sconst_0;
+					bspush 32;
+					invokestatic 55;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+					pop;
+					aload_1;
+					sconst_0;
+					bspush 32;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private createAvatar(Ljavacard/framework/APDU;)V {
+			.stack 5;
+			.locals 2;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L2;
+				L1:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L3;
+				L2:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L3:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L4:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L5:	sload_3;
+					sspush 8192;
+					if_scmple L7;
+				L6:	sspush 27268;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L7:	aload_2;
+					sconst_5;
+					getfield_a_this 3;		// reference citizen_applet/citizen_applet.avatar
+					sconst_0;
+					sload_3;
+					invokestatic 55;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+					pop;
+					aload_0;
+					sload_3;
+					putfield_s 18;		// short citizen_applet/citizen_applet.avatarLength
+					aload_2;
+					sconst_0;
+					getfield_s_this 18;		// short citizen_applet/citizen_applet.avatarLength
+					invokestatic 56;		// javacard/framework/Util.setShort([BSS)S
+					pop;
+					aload_1;
+					sconst_0;
+					sconst_2;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private processGet(Ljavacard/framework/APDU;BB)V {
+			.stack 5;
+			.locals 2;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifne L2;
+				L1:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore 4;
+				L3:	sload_3;
+					stableswitch L15 7 12 L12 L5 L8 L4 L6 L9;
+				L4:	getfield_a_this 0;		// reference citizen_applet/citizen_applet.cardId
+					sconst_0;
+					aload 4;
+					sconst_0;
+					bspush 32;
+					invokestatic 55;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+					pop;
+					aload_1;
+					sconst_0;
+					bspush 32;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					goto L16;
+				L5:	aload 4;
+					sconst_0;
+					getfield_b_this 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_1;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					goto L16;
+				L6:	getfield_a_this 12;		// reference citizen_applet/citizen_applet.rsaPublicKey
+					aload 4;
+					sconst_0;
+					invokestatic 57;		// citizen_applet/citizen_applet.serializePublicKey(Ljavacard/security/RSAPublicKey;[BS)S
+					sstore 5;
+				L7:	aload_1;
+					sconst_0;
+					sload 5;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					goto L16;
+				L8:	aload_0;
+					aload_1;
+					invokespecial 58;		// citizen_applet/citizen_applet.getAvatar(Ljavacard/framework/APDU;)V
+					goto L16;
+				L9:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L11;
+				L10:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L11:	aload_0;
+					aload_1;
+					invokespecial 59;		// citizen_applet/citizen_applet.getBalance(Ljavacard/framework/APDU;)V
+					goto L16;
+				L12:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L14;
+				L13:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L14:	aload_0;
+					aload_1;
+					invokespecial 60;		// citizen_applet/citizen_applet.getInfo(Ljavacard/framework/APDU;)V
+					goto L16;
+				L15:	sspush 27392;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L16:	return;
+		}
+
+		.method private getAvatar(Ljavacard/framework/APDU;)V {
+			.stack 5;
+			.locals 2;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_s_this 18;		// short citizen_applet/citizen_applet.avatarLength
+					ifne L2;
+				L1:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L3:	getfield_s_this 18;		// short citizen_applet/citizen_applet.avatarLength
+					sspush 256;
+					if_scmple L5;
+				L4:	sspush 256;
+					goto L6;
+				L5:	getfield_s_this 18;		// short citizen_applet/citizen_applet.avatarLength
+				L6:	sstore_3;
+				L7:	getfield_a_this 3;		// reference citizen_applet/citizen_applet.avatar
+					sconst_0;
+					aload_2;
+					sconst_0;
+					sload_3;
+					invokestatic 55;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+					pop;
+					aload_1;
+					sconst_0;
+					sload_3;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private getBalance(Ljavacard/framework/APDU;)V {
+			.stack 7;
+			.locals 1;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L1:	aload_0;
+					getfield_a_this 4;		// reference citizen_applet/citizen_applet.encryptedBalance
+					sconst_0;
+					bspush 16;
+					getfield_a_this 6;		// reference citizen_applet/citizen_applet.aesKey
+					aload_2;
+					sconst_0;
+					invokespecial 61;		// citizen_applet/citizen_applet.aesDecode([BSSLjavacard/security/AESKey;[BS)S
+					pop;
+					aload_1;
+					sconst_0;
+					sconst_4;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private getInfo(Ljavacard/framework/APDU;)V {
+			.stack 7;
+			.locals 2;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_s_this 17;		// short citizen_applet/citizen_applet.encryptedInfoLength
+					ifne L2;
+				L1:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L3:	aload_0;
+					getfield_a_this 2;		// reference citizen_applet/citizen_applet.encryptedInfo
+					sconst_0;
+					getfield_s_this 17;		// short citizen_applet/citizen_applet.encryptedInfoLength
+					getfield_a_this 6;		// reference citizen_applet/citizen_applet.aesKey
+					aload_2;
+					sconst_0;
+					invokespecial 61;		// citizen_applet/citizen_applet.aesDecode([BSSLjavacard/security/AESKey;[BS)S
+					sstore_3;
+				L4:	aload_1;
+					sconst_0;
+					sload_3;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private processUpdate(Ljavacard/framework/APDU;BB)V {
+			.stack 2;
+			.locals 0;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	sload_2;
+					stableswitch L12 4 12 L1 L2 L8 L12 L12 L12 L11 L9 L10;
+				L1:	aload_0;
+					aload_1;
+					invokespecial 62;		// citizen_applet/citizen_applet.updatePin(Ljavacard/framework/APDU;)V
+					goto L13;
+				L2:	sload_3;
+					bspush 9;
+					if_scmpne L4;
+				L3:	aload_0;
+					aload_1;
+					invokespecial 52;		// citizen_applet/citizen_applet.createAvatar(Ljavacard/framework/APDU;)V
+					goto L13;
+				L4:	sload_3;
+					bspush 7;
+					if_scmpne L6;
+				L5:	aload_0;
+					aload_1;
+					invokespecial 63;		// citizen_applet/citizen_applet.updateInfo(Ljavacard/framework/APDU;)V
+					goto L13;
+				L6:	sload_3;
+					bspush 12;
+					if_scmpne L13;
+				L7:	aload_0;
+					aload_1;
+					invokespecial 64;		// citizen_applet/citizen_applet.updateBalance(Ljavacard/framework/APDU;)V
+					goto L13;
+				L8:	aload_0;
+					aload_1;
+					invokespecial 65;		// citizen_applet/citizen_applet.signData(Ljavacard/framework/APDU;)V
+					goto L13;
+				L9:	aload_0;
+					aload_1;
+					invokespecial 66;		// citizen_applet/citizen_applet.activateCard(Ljavacard/framework/APDU;)V
+					goto L13;
+				L10:	aload_0;
+					aload_1;
+					invokespecial 67;		// citizen_applet/citizen_applet.deactivateCard(Ljavacard/framework/APDU;)V
+					goto L13;
+				L11:	aload_0;
+					aload_1;
+					invokespecial 68;		// citizen_applet/citizen_applet.forgetPin(Ljavacard/framework/APDU;)V
+					goto L13;
+				L12:	sspush 27392;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L13:	return;
+		}
+
+		.method private updatePin(Ljavacard/framework/APDU;)V {
+			.stack 6;
+			.locals 3;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L2;
+				L1:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L3;
+				L2:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L3:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L4:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L5:	sload_3;
+					bspush 8;
+					if_scmpeq L7;
+				L6:	sspush 26368;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L7:	bspush 16;
+					newarray 11;
+					astore 4;
+				L8:	getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					invokevirtual 46;		// javacard/security/MessageDigest.reset()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload_2;
+					sconst_5;
+					sconst_4;
+					aload 4;
+					sconst_0;
+					invokevirtual 47;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+					pop;
+					getfield_a_this 1;		// reference citizen_applet/citizen_applet.pinHash
+					sconst_0;
+					aload 4;
+					sconst_0;
+					bspush 16;
+					invokestatic 48;		// javacard/framework/Util.arrayCompare([BS[BSS)B
+					ifeq L10;
+				L9:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L10:	getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					invokevirtual 46;		// javacard/security/MessageDigest.reset()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload_2;
+					bspush 9;
+					sconst_4;
+					getfield_a_this 1;		// reference citizen_applet/citizen_applet.pinHash
+					sconst_0;
+					invokevirtual 47;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+					pop;
+					aload_0;
+					aload_2;
+					bspush 9;
+					invokespecial 49;		// citizen_applet/citizen_applet.generateAesKeyFromPin([BS)V
+					aload_2;
+					sconst_0;
+					sconst_1;
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_1;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private updateInfo(Ljavacard/framework/APDU;)V {
+			.stack 7;
+			.locals 2;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L2;
+				L1:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L3;
+				L2:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L3:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L4:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L5:	sload_3;
+					sspush 256;
+					if_scmple L7;
+				L6:	sspush 26368;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L7:	aload_0;
+					aload_0;
+					aload_2;
+					sconst_5;
+					sload_3;
+					getfield_a_this 6;		// reference citizen_applet/citizen_applet.aesKey
+					getfield_a_this 2;		// reference citizen_applet/citizen_applet.encryptedInfo
+					invokespecial 69;		// citizen_applet/citizen_applet.aesEncode([BSSLjavacard/security/AESKey;[B)S
+					putfield_s 17;		// short citizen_applet/citizen_applet.encryptedInfoLength
+					aload_2;
+					sconst_0;
+					sconst_1;
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_1;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private updateBalance(Ljavacard/framework/APDU;)V {
+			.stack 7;
+			.locals 9;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L2;
+				L1:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L3;
+				L2:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L3:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L4:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L5:	sload_3;
+					sconst_5;
+					if_scmpge L7;
+				L6:	sspush 26368;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L7:	aload_2;
+					sconst_5;
+					baload;
+					sstore 4;
+				L8:	aload_0;
+					aload_2;
+					bspush 6;
+					invokespecial 70;		// citizen_applet/citizen_applet.getInt([BS)I
+					istore 5;
+				L9:	aload_0;
+					getfield_a_this 4;		// reference citizen_applet/citizen_applet.encryptedBalance
+					sconst_0;
+					bspush 16;
+					getfield_a_this 6;		// reference citizen_applet/citizen_applet.aesKey
+					getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_0;
+					invokespecial 61;		// citizen_applet/citizen_applet.aesDecode([BSSLjavacard/security/AESKey;[BS)S
+					pop;
+					aload_0;
+					getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_0;
+					invokespecial 70;		// citizen_applet/citizen_applet.getInt([BS)I
+					istore 7;
+				L10:	sload 4;
+					sconst_1;
+					if_scmpne L13;
+				L11:	iload 7;
+					iload 5;
+					iadd;
+					istore 9;
+				L12:	goto L19;
+				L13:	sload 4;
+					sconst_2;
+					if_scmpne L18;
+				L14:	iload 7;
+					iload 5;
+					icmp;
+					ifge L16;
+				L15:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L16:	iload 7;
+					iload 5;
+					isub;
+					istore 9;
+				L17:	goto L19;
+				L18:	sspush 27264;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+					return;
+				L19:	aload_0;
+					iload 9;
+					invokespecial 54;		// citizen_applet/citizen_applet.setBalance(I)V
+					aload_0;
+					aload_2;
+					sconst_0;
+					iload 9;
+					invokespecial 71;		// citizen_applet/citizen_applet.putInt([BSI)V
+					aload_1;
+					sconst_0;
+					sconst_4;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private signData(Ljavacard/framework/APDU;)V {
+			.stack 7;
+			.locals 3;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L2;
+				L1:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L3;
+				L2:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L3:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L4:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L5:	aload_0;
+					getfield_a_this 11;		// reference citizen_applet/citizen_applet.rsaPrivateKey
+					aload_2;
+					sconst_5;
+					sload_3;
+					aload_2;
+					sconst_0;
+					invokespecial 72;		// citizen_applet/citizen_applet.rsaSign(Ljavacard/security/RSAPrivateKey;[BSS[BS)S
+					sstore 4;
+				L6:	aload_1;
+					sconst_0;
+					sload 4;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private activateCard(Ljavacard/framework/APDU;)V {
+			.stack 6;
+			.locals 3;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifne L2;
+				L1:	sspush 27013;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L3:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L4:	sload_3;
+					sconst_4;
+					if_scmpne L8;
+				L5:	bspush 16;
+					newarray 11;
+					astore 4;
+				L6:	getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					invokevirtual 46;		// javacard/security/MessageDigest.reset()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload_2;
+					sconst_5;
+					sconst_4;
+					aload 4;
+					sconst_0;
+					invokevirtual 47;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+					pop;
+					getfield_a_this 1;		// reference citizen_applet/citizen_applet.pinHash
+					sconst_0;
+					aload 4;
+					sconst_0;
+					bspush 16;
+					invokestatic 48;		// javacard/framework/Util.arrayCompare([BS[BSS)B
+					ifne L8;
+				L7:	aload_0;
+					sconst_1;
+					putfield_b 14;		// boolean citizen_applet/citizen_applet.cardActive
+					aload_0;
+					sconst_1;
+					putfield_b 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					aload_0;
+					sconst_5;
+					putfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					aload_0;
+					aload_2;
+					sconst_5;
+					invokespecial 49;		// citizen_applet/citizen_applet.generateAesKeyFromPin([BS)V
+					aload_2;
+					sconst_0;
+					sconst_1;
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_1;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+				L8:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+					return;
+		}
+
+		.method private deactivateCard(Ljavacard/framework/APDU;)V {
+			.stack 3;
+			.locals 1;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	getfield_b_this 13;		// boolean citizen_applet/citizen_applet.cardInitialized
+					ifeq L2;
+				L1:	getfield_b_this 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					ifne L3;
+				L2:	sspush 27010;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L3:	aload_0;
+					sconst_0;
+					putfield_b 14;		// boolean citizen_applet/citizen_applet.cardActive
+					aload_0;
+					sconst_0;
+					putfield_b 16;		// boolean citizen_applet/citizen_applet.pinVerified
+					aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L4:	aload_2;
+					sconst_0;
+					sconst_1;
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_1;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private forgetPin(Ljavacard/framework/APDU;)V {
+			.stack 6;
+			.locals 2;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L1:	aload_1;
+					invokevirtual 45;		// javacard/framework/APDU.setIncomingAndReceive()S
+					sstore_3;
+				L2:	sload_3;
+					sconst_4;
+					if_scmpeq L4;
+				L3:	sspush 26368;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L4:	getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					invokevirtual 46;		// javacard/security/MessageDigest.reset()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload_2;
+					sconst_5;
+					sconst_4;
+					getfield_a_this 1;		// reference citizen_applet/citizen_applet.pinHash
+					sconst_0;
+					invokevirtual 47;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+					pop;
+					aload_0;
+					sconst_5;
+					putfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					aload_2;
+					sconst_0;
+					sconst_1;
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_1;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private resetPinTries(Ljavacard/framework/APDU;)V {
+			.stack 3;
+			.locals 1;
+
+			.descriptor	Ljavacard/framework/APDU;	0.10;
+
+				L0:	aload_0;
+					sconst_5;
+					putfield_b 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					aload_1;
+					invokevirtual 37;		// javacard/framework/APDU.getBuffer()[B
+					astore_2;
+				L1:	aload_2;
+					sconst_0;
+					getfield_b_this 15;		// byte citizen_applet/citizen_applet.pinTryCounter
+					bastore;
+					aload_1;
+					sconst_0;
+					sconst_1;
+					invokevirtual 50;		// javacard/framework/APDU.setOutgoingAndSend(SS)V
+					return;
+		}
+
+		.method private generateCardId()V {
+			.stack 5;
+			.locals 4;
+
+				L0:	bspush 8;
+					newarray 11;
+					dup;
+					sconst_0;
+					bspush 67;
+					bastore;
+					dup;
+					sconst_1;
+					bspush 73;
+					bastore;
+					dup;
+					sconst_2;
+					bspush 84;
+					bastore;
+					dup;
+					sconst_3;
+					bspush 73;
+					bastore;
+					dup;
+					sconst_4;
+					bspush 90;
+					bastore;
+					dup;
+					sconst_5;
+					bspush 69;
+					bastore;
+					dup;
+					bspush 6;
+					bspush 78;
+					bastore;
+					dup;
+					bspush 7;
+					bspush 45;
+					bastore;
+					astore_1;
+				L1:	sconst_0;
+					sstore_2;
+				L2:	aload_1;
+					sconst_0;
+					getfield_a_this 0;		// reference citizen_applet/citizen_applet.cardId
+					sload_2;
+					aload_1;
+					arraylength;
+					invokestatic 55;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+					pop;
+					sload_2;
+					aload_1;
+					arraylength;
+					sadd;
+					sstore_2;
+					bspush 12;
+					newarray 11;
+					astore_3;
+				L3:	getfield_a_this 10;		// reference citizen_applet/citizen_applet.randomGenerator
+					aload_3;
+					sconst_0;
+					bspush 12;
+					invokevirtual 73;		// javacard/security/RandomData.generateData([BSS)V
+					sconst_0;
+					sstore 4;
+				L4:	sload 4;
+					bspush 12;
+					if_scmpge L6;
+				L5:	getfield_a_this 0;		// reference citizen_applet/citizen_applet.cardId
+					sload_2;
+					sinc 2 1;
+					aload_0;
+					aload_3;
+					sload 4;
+					baload;
+					sconst_4;
+					sshr;
+					bspush 15;
+					sand;
+					invokespecial 74;		// citizen_applet/citizen_applet.getHexChar(B)B
+					bastore;
+					getfield_a_this 0;		// reference citizen_applet/citizen_applet.cardId
+					sload_2;
+					sinc 2 1;
+					aload_0;
+					aload_3;
+					sload 4;
+					baload;
+					bspush 15;
+					sand;
+					invokespecial 74;		// citizen_applet/citizen_applet.getHexChar(B)B
+					bastore;
+					sinc 4 1;
+					goto L4;
+				L6:	return;
+		}
+
+		.method private getHexChar(B)B {
+			.stack 2;
+			.locals 0;
+
+				L0:	sload_1;
+					bspush 10;
+					if_scmpge L2;
+				L1:	bspush 48;
+					sload_1;
+					sadd;
+					s2b;
+					sreturn;
+				L2:	bspush 65;
+					sload_1;
+					sadd;
+					bspush 10;
+					ssub;
+					s2b;
+					sreturn;
+		}
+
+		.method private generateAesKeyFromPin([BS)V {
+			.stack 6;
+			.locals 2;
+
+				L0:	bspush 16;
+					newarray 11;
+					astore_3;
+				L1:	getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					invokevirtual 46;		// javacard/security/MessageDigest.reset()V
+					getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload_1;
+					sload_2;
+					sconst_4;
+					invokevirtual 75;		// javacard/security/MessageDigest.update([BSS)V
+					bspush 7;
+					newarray 11;
+					dup;
+					sconst_0;
+					bspush 67;
+					bastore;
+					dup;
+					sconst_1;
+					bspush 73;
+					bastore;
+					dup;
+					sconst_2;
+					bspush 84;
+					bastore;
+					dup;
+					sconst_3;
+					bspush 73;
+					bastore;
+					dup;
+					sconst_4;
+					bspush 90;
+					bastore;
+					dup;
+					sconst_5;
+					bspush 69;
+					bastore;
+					dup;
+					bspush 6;
+					bspush 78;
+					bastore;
+					astore 4;
+				L2:	getfield_a_this 9;		// reference citizen_applet/citizen_applet.md5
+					aload 4;
+					sconst_0;
+					aload 4;
+					arraylength;
+					aload_3;
+					sconst_0;
+					invokevirtual 47;		// javacard/security/MessageDigest.doFinal([BSS[BS)S
+					pop;
+					getfield_a_this 6;		// reference citizen_applet/citizen_applet.aesKey
+					aload_3;
+					sconst_0;
+					invokeinterface 3 26 4;		// javacard/security/AESKey
+					return;
+		}
+
+		.method private setBalance(I)V {
+			.stack 6;
+			.locals 0;
+
+				L0:	getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_0;
+					iload_1;
+					bipush 24;
+					ishr;
+					i2b;
+					bastore;
+					getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_1;
+					iload_1;
+					bipush 16;
+					ishr;
+					i2b;
+					bastore;
+					getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_2;
+					iload_1;
+					bipush 8;
+					ishr;
+					i2b;
+					bastore;
+					getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_3;
+					iload_1;
+					sipush 255;
+					iand;
+					i2b;
+					bastore;
+					getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_4;
+					bspush 12;
+					sconst_0;
+					invokestatic 76;		// javacard/framework/Util.arrayFillNonAtomic([BSSB)S
+					pop;
+					aload_0;
+					getfield_a_this 5;		// reference citizen_applet/citizen_applet.tempBuffer
+					sconst_0;
+					bspush 16;
+					getfield_a_this 6;		// reference citizen_applet/citizen_applet.aesKey
+					getfield_a_this 4;		// reference citizen_applet/citizen_applet.encryptedBalance
+					invokespecial 69;		// citizen_applet/citizen_applet.aesEncode([BSSLjavacard/security/AESKey;[B)S
+					pop;
+					return;
+		}
+
+		.method private getInt([BS)I {
+			.stack 6;
+			.locals 0;
+
+				L0:	aload_1;
+					sload_2;
+					baload;
+					s2i;
+					sipush 255;
+					iand;
+					bipush 24;
+					ishl;
+					aload_1;
+					sload_2;
+					sconst_1;
+					sadd;
+					baload;
+					s2i;
+					sipush 255;
+					iand;
+					bipush 16;
+					ishl;
+					ior;
+					aload_1;
+					sload_2;
+					sconst_2;
+					sadd;
+					baload;
+					s2i;
+					sipush 255;
+					iand;
+					bipush 8;
+					ishl;
+					ior;
+					aload_1;
+					sload_2;
+					sconst_3;
+					sadd;
+					baload;
+					s2i;
+					sipush 255;
+					iand;
+					ior;
+					ireturn;
+		}
+
+		.method private putInt([BSI)V {
+			.stack 6;
+			.locals 0;
+
+				L0:	aload_1;
+					sload_2;
+					iload_3;
+					bipush 24;
+					ishr;
+					i2b;
+					bastore;
+					aload_1;
+					sload_2;
+					sconst_1;
+					sadd;
+					iload_3;
+					bipush 16;
+					ishr;
+					i2b;
+					bastore;
+					aload_1;
+					sload_2;
+					sconst_2;
+					sadd;
+					iload_3;
+					bipush 8;
+					ishr;
+					i2b;
+					bastore;
+					aload_1;
+					sload_2;
+					sconst_3;
+					sadd;
+					iload_3;
+					sipush 255;
+					iand;
+					i2b;
+					bastore;
+					return;
+		}
+
+		.method private applyPadding([BSS)S {
+			.stack 4;
+			.locals 1;
+
+				L0:	sload_3;
+					bspush 16;
+					sload_3;
+					bspush 16;
+					srem;
+					ssub;
+					sadd;
+					sstore 4;
+				L1:	aload_1;
+					sload_3;
+					sload_2;
+					sadd;
+					sload 4;
+					sload_3;
+					ssub;
+					sconst_0;
+					invokestatic 76;		// javacard/framework/Util.arrayFillNonAtomic([BSSB)S
+					pop;
+					sload 4;
+					sreturn;
+		}
+
+		.method private removePadding([BS)S {
+			.stack 2;
+			.locals 3;
+
+				L0:	sconst_0;
+					sstore_3;
+				L1:	sconst_0;
+					sstore 4;
+				L2:	sload_2;
+					sconst_1;
+					ssub;
+					sstore 5;
+				L3:	sload 5;
+					iflt L7;
+				L4:	aload_1;
+					sload 5;
+					baload;
+					sload_3;
+					if_scmpeq L6;
+				L5:	goto L7;
+				L6:	sinc 4 1;
+					sinc 5 -1;
+					goto L3;
+				L7:	sload_2;
+					sload 4;
+					ssub;
+					sreturn;
+		}
+
+		.method private aesEncode([BSSLjavacard/security/AESKey;[B)S {
+			.stack 6;
+			.locals 1;
+
+			.descriptor	Ljavacard/security/AESKey;	1.20;
+
+				L0:	sload_3;
+					sconst_1;
+					if_scmpge L2;
+				L1:	sspush 27012;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	aload_0;
+					aload_1;
+					sload_2;
+					sload_3;
+					invokespecial 77;		// citizen_applet/citizen_applet.applyPadding([BSS)S
+					sstore 6;
+				L3:	getfield_a_this 7;		// reference citizen_applet/citizen_applet.aesCipher
+					aload 4;
+					sconst_2;
+					invokevirtual 78;		// javacardx/crypto/Cipher.init(Ljavacard/security/Key;B)V
+					getfield_a_this 7;		// reference citizen_applet/citizen_applet.aesCipher
+					aload_1;
+					sload_2;
+					sload 6;
+					aload 5;
+					sconst_0;
+					invokevirtual 79;		// javacardx/crypto/Cipher.doFinal([BSS[BS)S
+					pop;
+					sload 6;
+					sreturn;
+		}
+
+		.method private aesDecode([BSSLjavacard/security/AESKey;[BS)S {
+			.stack 6;
+			.locals 0;
+
+			.descriptor	Ljavacard/security/AESKey;	1.20;
+
+				L0:	sload_3;
+					bspush 16;
+					srem;
+					ifeq L2;
+				L1:	sspush 27012;
+					invokestatic 38;		// javacard/framework/ISOException.throwIt(S)V
+				L2:	getfield_a_this 7;		// reference citizen_applet/citizen_applet.aesCipher
+					aload 4;
+					sconst_1;
+					invokevirtual 78;		// javacardx/crypto/Cipher.init(Ljavacard/security/Key;B)V
+					getfield_a_this 7;		// reference citizen_applet/citizen_applet.aesCipher
+					aload_1;
+					sload_2;
+					sload_3;
+					aload 5;
+					sload 6;
+					invokevirtual 79;		// javacardx/crypto/Cipher.doFinal([BSS[BS)S
+					pop;
+					aload_0;
+					aload 5;
+					sload_3;
+					invokespecial 80;		// citizen_applet/citizen_applet.removePadding([BS)S
+					sreturn;
+		}
+
+		.method private rsaSign(Ljavacard/security/RSAPrivateKey;[BSS[BS)S {
+			.stack 6;
+			.locals 0;
+
+			.descriptor	Ljavacard/security/RSAPrivateKey;	1.8;
+
+				L0:	getfield_a_this 8;		// reference citizen_applet/citizen_applet.rsaSignature
+					aload_1;
+					sconst_1;
+					invokevirtual 81;		// javacard/security/Signature.init(Ljavacard/security/Key;B)V
+					getfield_a_this 8;		// reference citizen_applet/citizen_applet.rsaSignature
+					aload_2;
+					sload_3;
+					sload 4;
+					aload 5;
+					sload 6;
+					invokevirtual 82;		// javacard/security/Signature.sign([BSS[BS)S
+					sreturn;
+		}
+
+		.method private static serializePublicKey(Ljavacard/security/RSAPublicKey;[BS)S {
+			.stack 5;
+			.locals 4;
+
+			.descriptor	Ljavacard/security/RSAPublicKey;	1.9;
+
+				L0:	sload_2;
+					sstore_3;
+				L1:	sspush 128;
+					newarray 11;
+					astore 4;
+				L2:	aload_0;
+					aload 4;
+					sconst_0;
+					invokeinterface 3 28 4;		// javacard/security/RSAPublicKey
+					sstore 5;
+				L3:	aload_1;
+					sload_3;
+					sload 5;
+					invokestatic 56;		// javacard/framework/Util.setShort([BSS)S
+					pop;
+					sinc 3 2;
+					aload 4;
+					sconst_0;
+					aload_1;
+					sload_3;
+					sload 5;
+					invokestatic 55;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+					pop;
+					sload_3;
+					sload 5;
+					sadd;
+					sstore_3;
+					aload_0;
+					aload 4;
+					sconst_0;
+					invokeinterface 3 28 5;		// javacard/security/RSAPublicKey
+					sstore 6;
+				L4:	aload_1;
+					sload_3;
+					sload 6;
+					invokestatic 56;		// javacard/framework/Util.setShort([BSS)S
+					pop;
+					sinc 3 2;
+					aload 4;
+					sconst_0;
+					aload_1;
+					sload_3;
+					sload 6;
+					invokestatic 55;		// javacard/framework/Util.arrayCopy([BS[BSS)S
+					pop;
+					sload_3;
+					sload 6;
+					sadd;
+					sstore_3;
+					sload_3;
+					sload_2;
+					ssub;
+					sreturn;
+		}
+
+	}
+
+}

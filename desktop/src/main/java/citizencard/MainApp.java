@@ -4,6 +4,9 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
+import citizencard.controller.LoginViewController;
+import citizencard.dao.CardDAO;
+
 /**
  * Main Application Entry Point
  * 

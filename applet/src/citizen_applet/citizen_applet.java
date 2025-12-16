@@ -1,57 +1,59 @@
-package citizen_applet;
+	package citizen_applet;
 
 import javacard.framework.*;
 import javacard.security.*;
 import javacardx.crypto.*;
 
 /**
- * CITIZEN CARD SMART CARD APPLET
+ * CITIZEN CARD SMART CARD APPLET v2.0 (JavaCard 2.2.1 Compatible)
  * 
- * Tuân thủ chuẩn Smart Card Development:
- * - Tất cả dữ liệu quan trọng được lưu và mã hóa trong thẻ
- * - Sử dụng AES để mã hóa dữ liệu (key từ PIN)
- * - Sử dụng RSA để xác thực và bảo mật giao tiếp
- * - PIN authentication với giới hạn retry
- * - Card ID được tạo tự động theo chuẩn
+ * Features:
+ * - MD5 PIN hashing with 5 retry attempts
+ * - AES-128-ECB encryption
+ * - RSA-1024 digital signature
+ * - Card activation/deactivation
+ * - Photo storage up to 8KB (chunked transfer)
  */
 public class citizen_applet extends Applet {
     
     // =====================================================
-    // CONSTANTS - INS CODES
+    // INS CODES
     // =====================================================
-    private static final byte INS_SELECT_APPLET = (byte) 0xA4;
-    private static final byte INS_INITIALIZE_CARD = (byte) 0x10;
-    private static final byte INS_VERIFY_PIN = (byte) 0x20;
-    private static final byte INS_CHANGE_PIN = (byte) 0x21;
-    private static final byte INS_GET_CARD_ID = (byte) 0x30;
-    private static final byte INS_GET_PUBLIC_KEY = (byte) 0x31;
-    private static final byte INS_GET_CARD_INFO = (byte) 0x32;
-    private static final byte INS_UPDATE_CARD_INFO = (byte) 0x33;
-    private static final byte INS_GET_BALANCE = (byte) 0x40;
-    private static final byte INS_TOPUP_BALANCE = (byte) 0x41;
-    private static final byte INS_PAYMENT = (byte) 0x42;
-    private static final byte INS_GET_TRANSACTION_HISTORY = (byte) 0x43;
-    private static final byte INS_RESET_CARD = (byte) 0xFF;
+    private static final byte INS_VERIFY = (byte) 0x00;
+    private static final byte INS_CREATE = (byte) 0x01;
+    private static final byte INS_GET = (byte) 0x02;
+    private static final byte INS_UPDATE = (byte) 0x03;
+    private static final byte INS_RESET_TRY_PIN = (byte) 0x10;
     
     // =====================================================
-    // STORAGE CONSTANTS
+    // P1 PARAMETERS (Command Type)
     // =====================================================
+    private static final byte P1_PIN = (byte) 0x04;
+    private static final byte P1_CITIZEN_INFO = (byte) 0x05;
+    private static final byte P1_SIGNATURE = (byte) 0x06;
+    private static final byte P1_FORGET_PIN = (byte) 0x0A;
+    private static final byte P1_ACTIVATE_CARD = (byte) 0x0B;
+    private static final byte P1_DEACTIVATE_CARD = (byte) 0x0C;
+    
+    // =====================================================
+    // P2 PARAMETERS (Data Type)
+    // =====================================================
+    private static final byte P2_INFORMATION = (byte) 0x07;
+    private static final byte P2_TRY_REMAINING = (byte) 0x08;
+    private static final byte P2_AVATAR = (byte) 0x09;
+    private static final byte P2_CARD_ID = (byte) 0x0A;
+    private static final byte P2_PUBLIC_KEY = (byte) 0x0B;
+    private static final byte P2_BALANCE = (byte) 0x0C;
+    
+    // =====================================================
+    // CONSTANTS
+    // =====================================================
+    private static final byte PIN_LENGTH = 4;
+    private static final byte MAX_PIN_TRIES = 5;
     private static final short CARD_ID_LENGTH = 32;
-    private static final short PIN_LENGTH = 4;
-    private static final short MAX_PIN_TRIES = 3;
-    private static final short AES_KEY_LENGTH = 16;
-    private static final short RSA_KEY_LENGTH = 128; // 1024 bits
-    
-    // Personal Info Storage (AES encrypted)
-    private static final short NAME_MAX_LENGTH = 50;
-    private static final short DOB_LENGTH = 10; // YYYY-MM-DD
-    private static final short ID_NUMBER_LENGTH = 12;
-    private static final short ADDRESS_MAX_LENGTH = 100;
-    private static final short PHONE_LENGTH = 11;
-    
-    // Transaction History (limited)
-    private static final short MAX_TRANSACTIONS = 10;
-    private static final short TRANSACTION_RECORD_SIZE = 20; // timestamp(8) + type(1) + amount(4) + balance(4) + ref(3)
+    private static final short MAX_INFO_LENGTH = 256;
+    private static final short MAX_AVATAR_SIZE = 8192;   // 8KB (JavaCard 2.2.1 limit)
+    private static final short RSA_KEY_LENGTH = 1024;
     
     // =====================================================
     // PERSISTENT STORAGE
@@ -59,34 +61,36 @@ public class citizen_applet extends Applet {
     
     // Card State
     private boolean cardInitialized;
+    private boolean cardActive;
     private byte[] cardId;
+    
+    // PIN Management
+    private byte[] pinHash;          // MD5 hash of PIN (16 bytes)
     private byte pinTryCounter;
     private boolean pinVerified;
     
-    // PIN and Security
-    private byte[] pinHash; // SHA-256 hash of PIN
-    private AESKey aesKey;  // AES key derived from PIN
-    
-    // RSA Key Pair
+    // Crypto Keys
+    private AESKey aesKey;
     private RSAPrivateKey rsaPrivateKey;
     private RSAPublicKey rsaPublicKey;
     
-    // Encrypted Personal Information (AES encrypted)
-    private byte[] encryptedPersonalInfo; // name + dob + idNumber + address + phone
-    private byte[] encryptedPhoto; // Optional photo data
+    // Encrypted Data Storage
+    private byte[] encryptedInfo;
+    private short encryptedInfoLength;
     
-    // Financial Data (AES encrypted)
-    private byte[] encryptedBalance; // 4 bytes balance
+    private byte[] avatar;
+    private short avatarLength;
     
-    // Transaction History (AES encrypted)
-    private byte[] encryptedTransactionHistory;
-    private byte transactionCount;
+    private byte[] encryptedBalance;
     
-    // Crypto Objects
+    // Crypto helpers
     private Cipher aesCipher;
-    private Cipher rsaCipher;
-    private MessageDigest sha256;
+    private Signature rsaSignature;
+    private MessageDigest md5;
     private RandomData randomGenerator;
+    
+    // Temporary buffers
+    private byte[] tempBuffer;
     
     // =====================================================
     // APPLET LIFECYCLE
@@ -97,42 +101,38 @@ public class citizen_applet extends Applet {
     }
     
     protected citizen_applet() {
-        // Initialize storage arrays
+        // Initialize storage
         cardId = new byte[CARD_ID_LENGTH];
-        pinHash = new byte[32]; // SHA-256 output
+        pinHash = new byte[16];  // MD5 = 16 bytes
+        encryptedInfo = new byte[MAX_INFO_LENGTH + 16];  // + padding
+        avatar = new byte[MAX_AVATAR_SIZE];
+        encryptedBalance = new byte[16];
+        tempBuffer = new byte[256];
+        
+        // Initialize crypto
         aesKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
+        aesCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+        rsaSignature = Signature.getInstance(Signature.ALG_RSA_SHA_PKCS1, false);
+        md5 = MessageDigest.getInstance(MessageDigest.ALG_MD5, false);
+        randomGenerator = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
         
-        // Initialize encrypted storage
-        encryptedPersonalInfo = new byte[NAME_MAX_LENGTH + DOB_LENGTH + ID_NUMBER_LENGTH + ADDRESS_MAX_LENGTH + PHONE_LENGTH + 16]; // +16 for padding
-        encryptedBalance = new byte[16]; // 4 bytes data + 12 bytes padding
-        encryptedTransactionHistory = new byte[MAX_TRANSACTIONS * TRANSACTION_RECORD_SIZE + 16];
-        
-        // Initialize crypto objects
-        try {
-            aesCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false);
-            rsaCipher = Cipher.getInstance(Cipher.ALG_RSA_PKCS1, false);
-            sha256 = MessageDigest.getInstance(MessageDigest.ALG_SHA_256, false);
-            randomGenerator = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
-            
-            // Generate RSA key pair
-            KeyPair rsaKeyPair = new KeyPair(KeyPair.ALG_RSA, KeyBuilder.LENGTH_RSA_1024);
-            rsaKeyPair.genKeyPair();
-            rsaPrivateKey = (RSAPrivateKey) rsaKeyPair.getPrivate();
-            rsaPublicKey = (RSAPublicKey) rsaKeyPair.getPublic();
-            
-        } catch (CryptoException e) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-        }
+        // Generate RSA key pair
+        KeyPair rsaKeyPair = new KeyPair(KeyPair.ALG_RSA, KeyBuilder.LENGTH_RSA_1024);
+        rsaKeyPair.genKeyPair();
+        rsaPrivateKey = (RSAPrivateKey) rsaKeyPair.getPrivate();
+        rsaPublicKey = (RSAPublicKey) rsaKeyPair.getPublic();
         
         // Initialize state
         cardInitialized = false;
+        cardActive = false;
         pinTryCounter = MAX_PIN_TRIES;
         pinVerified = false;
-        transactionCount = 0;
+        encryptedInfoLength = 0;
+        avatarLength = 0;
     }
     
     // =====================================================
-    // MAIN PROCESSING
+    // MAIN APDU PROCESSING
     // =====================================================
     
     public void process(APDU apdu) {
@@ -142,132 +142,48 @@ public class citizen_applet extends Applet {
         
         byte[] buffer = apdu.getBuffer();
         byte ins = buffer[ISO7816.OFFSET_INS];
+        byte p1 = buffer[ISO7816.OFFSET_P1];
+        byte p2 = buffer[ISO7816.OFFSET_P2];
         
-        try {
-            switch (ins) {
-                case INS_INITIALIZE_CARD:
-                    initializeCard(apdu);
-                    break;
-                case INS_VERIFY_PIN:
-                    verifyPin(apdu);
-                    break;
-                case INS_CHANGE_PIN:
-                    changePin(apdu);
-                    break;
-                case INS_GET_CARD_ID:
-                    getCardId(apdu);
-                    break;
-                case INS_GET_PUBLIC_KEY:
-                    getPublicKey(apdu);
-                    break;
-                case INS_GET_CARD_INFO:
-                    getCardInfo(apdu);
-                    break;
-                case INS_UPDATE_CARD_INFO:
-                    updateCardInfo(apdu);
-                    break;
-                case INS_GET_BALANCE:
-                    getBalance(apdu);
-                    break;
-                case INS_TOPUP_BALANCE:
-                    topupBalance(apdu);
-                    break;
-                case INS_PAYMENT:
-                    makePayment(apdu);
-                    break;
-                case INS_GET_TRANSACTION_HISTORY:
-                    getTransactionHistory(apdu);
-                    break;
-                case INS_RESET_CARD:
-                    resetCard(apdu);
-                    break;
-                default:
-                    ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
+        // Card activation check (except for activation command itself)
+        if (!cardActive && ins != INS_CREATE && !(ins == INS_UPDATE && p1 == P1_ACTIVATE_CARD)) {
+            if (cardInitialized) {
+                ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
             }
-        } catch (Exception e) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+        
+        switch (ins) {
+            case INS_VERIFY:
+                processVerify(apdu, p1, p2);
+                break;
+            case INS_CREATE:
+                processCreate(apdu, p1, p2);
+                break;
+            case INS_GET:
+                processGet(apdu, p1, p2);
+                break;
+            case INS_UPDATE:
+                processUpdate(apdu, p1, p2);
+                break;
+            case INS_RESET_TRY_PIN:
+                resetPinTries(apdu);
+                break;
+            default:
+                ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
         }
     }
     
     // =====================================================
-    // CARD INITIALIZATION
+    // INS_VERIFY (0x00)
     // =====================================================
     
-    private void initializeCard(APDU apdu) {
-        if (cardInitialized) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-        }
-        
-        byte[] buffer = apdu.getBuffer();
-        short lc = apdu.setIncomingAndReceive();
-        
-        if (lc < PIN_LENGTH) {
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        }
-        
-        // Generate unique Card ID
-        generateCardId();
-        
-        // Set initial PIN
-        byte[] initialPin = new byte[PIN_LENGTH];
-        Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, initialPin, (short) 0, PIN_LENGTH);
-        setPinAndGenerateAESKey(initialPin);
-        
-        // Initialize balance to 0
-        setBalance(0);
-        
-        cardInitialized = true;
-        pinTryCounter = MAX_PIN_TRIES;
-        
-        // Return Card ID
-        Util.arrayCopy(cardId, (short) 0, buffer, (short) 0, CARD_ID_LENGTH);
-        apdu.setOutgoingAndSend((short) 0, CARD_ID_LENGTH);
-    }
-    
-    private void generateCardId() {
-        // Format: CITIZEN-CARD-YYYYMMDD-HHMMSS-RANDOM
-        byte[] timestamp = new byte[8];
-        byte[] randomBytes = new byte[8];
-        
-        // Get current timestamp (simplified - in real implementation use RTC)
-        // For demo, use random data
-        randomGenerator.generateData(timestamp, (short) 0, (short) 8);
-        randomGenerator.generateData(randomBytes, (short) 0, (short) 8);
-        
-        // Build Card ID string
-        byte[] prefix = "CITIZEN-CARD-".getBytes();
-        short offset = 0;
-        
-        // Copy prefix
-        Util.arrayCopy(prefix, (short) 0, cardId, offset, (short) prefix.length);
-        offset += prefix.length;
-        
-        // Add timestamp hex
-        for (short i = 0; i < 8; i++) {
-            cardId[offset++] = getHexChar((byte) ((timestamp[i] >> 4) & 0x0F));
-            cardId[offset++] = getHexChar((byte) (timestamp[i] & 0x0F));
-        }
-        
-        cardId[offset++] = '-';
-        
-        // Add random hex
-        for (short i = 0; i < 4; i++) {
-            cardId[offset++] = getHexChar((byte) ((randomBytes[i] >> 4) & 0x0F));
-            cardId[offset++] = getHexChar((byte) (randomBytes[i] & 0x0F));
-        }
-    }
-    
-    private byte getHexChar(byte value) {
-        if (value < 10) {
-            return (byte) ('0' + value);
+    private void processVerify(APDU apdu, byte p1, byte p2) {
+        if (p1 == P1_PIN) {
+            verifyPin(apdu);
         } else {
-            return (byte) ('A' + value - 10);
+            ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
         }
     }
-    
-    // =====================================================
-    // PIN MANAGEMENT
-    // =====================================================
     
     private void verifyPin(APDU apdu) {
         if (!cardInitialized) {
@@ -285,157 +201,230 @@ public class citizen_applet extends Applet {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
         
-        // Hash the provided PIN
-        byte[] providedPin = new byte[PIN_LENGTH];
-        Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, providedPin, (short) 0, PIN_LENGTH);
+        // Hash provided PIN with MD5
+        byte[] providedPinHash = new byte[16];
+        md5.reset();
+        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, providedPinHash, (short) 0);
         
-        byte[] providedPinHash = new byte[32];
-        sha256.reset();
-        sha256.update(providedPin, (short) 0, PIN_LENGTH);
-        sha256.doFinal(providedPin, (short) 0, (short) 0, providedPinHash, (short) 0);
-        
-        // Compare with stored hash
-        if (Util.arrayCompare(pinHash, (short) 0, providedPinHash, (short) 0, (short) 32) == 0) {
+        // Compare hashes
+        if (Util.arrayCompare(pinHash, (short) 0, providedPinHash, (short) 0, (short) 16) == 0) {
             pinVerified = true;
-            pinTryCounter = MAX_PIN_TRIES; // Reset counter on success
+            pinTryCounter = MAX_PIN_TRIES;
             
-            // Regenerate AES key from PIN
-            generateAESKeyFromPin(providedPin);
+            // Generate AES key from PIN
+            generateAesKeyFromPin(buffer, ISO7816.OFFSET_CDATA);
             
-            buffer[0] = (byte) 0x90; // Success
-            apdu.setOutgoingAndSend((short) 0, (short) 1);
+            // Return success
+            buffer[0] = (byte) 0x01;  // Success
+            buffer[1] = pinTryCounter;
+            apdu.setOutgoingAndSend((short) 0, (short) 2);
         } else {
             pinTryCounter--;
             pinVerified = false;
             
-            buffer[0] = (byte) pinTryCounter; // Remaining tries
-            apdu.setOutgoingAndSend((short) 0, (short) 1);
+            // Return failure with remaining tries
+            buffer[0] = (byte) 0x00;  // Failure
+            buffer[1] = pinTryCounter;
+            apdu.setOutgoingAndSend((short) 0, (short) 2);
             
             if (pinTryCounter == 0) {
-                ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+                cardActive = false;  // Deactivate card
             }
         }
     }
     
-    private void changePin(APDU apdu) {
-        if (!cardInitialized || !pinVerified) {
-            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+    // =====================================================
+    // INS_CREATE (0x01)
+    // =====================================================
+    
+    private void processCreate(APDU apdu, byte p1, byte p2) {
+        if (p1 == P1_PIN) {
+            initializeCard(apdu);
+        } else if (p1 == P1_CITIZEN_INFO && p2 == P2_AVATAR) {
+            createAvatar(apdu);
+        } else {
+            ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        }
+    }
+    
+    private void initializeCard(APDU apdu) {
+        if (cardInitialized) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
         
         byte[] buffer = apdu.getBuffer();
         short lc = apdu.setIncomingAndReceive();
         
-        if (lc != PIN_LENGTH * 2) { // Old PIN + New PIN
+        if (lc < PIN_LENGTH) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
         
-        // Verify old PIN first
-        byte[] oldPin = new byte[PIN_LENGTH];
-        byte[] newPin = new byte[PIN_LENGTH];
+        // Generate unique Card ID
+        generateCardId();
         
-        Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, oldPin, (short) 0, PIN_LENGTH);
-        Util.arrayCopy(buffer, (short) (ISO7816.OFFSET_CDATA + PIN_LENGTH), newPin, (short) 0, PIN_LENGTH);
-        
-        // Hash old PIN and verify
-        byte[] oldPinHash = new byte[32];
-        sha256.reset();
-        sha256.update(oldPin, (short) 0, PIN_LENGTH);
-        sha256.doFinal(oldPin, (short) 0, (short) 0, oldPinHash, (short) 0);
-        
-        if (Util.arrayCompare(pinHash, (short) 0, oldPinHash, (short) 0, (short) 32) != 0) {
-            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
-        }
-        
-        // Set new PIN
-        setPinAndGenerateAESKey(newPin);
-        
-        // Re-encrypt all data with new AES key
-        // (In real implementation, decrypt with old key and encrypt with new key)
-        
-        buffer[0] = (byte) 0x90; // Success
-        apdu.setOutgoingAndSend((short) 0, (short) 1);
-    }
-    
-    private void setPinAndGenerateAESKey(byte[] pin) {
-        // Hash PIN for storage
-        sha256.reset();
-        sha256.update(pin, (short) 0, PIN_LENGTH);
-        sha256.doFinal(pin, (short) 0, (short) 0, pinHash, (short) 0);
+        // Hash PIN with MD5
+        md5.reset();
+        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, pinHash, (short) 0);
         
         // Generate AES key from PIN
-        generateAESKeyFromPin(pin);
-    }
-    
-    private void generateAESKeyFromPin(byte[] pin) {
-        // Simple key derivation: SHA-256(PIN + salt) -> first 16 bytes
-        byte[] salt = "CITIZEN_CARD_AES".getBytes();
-        byte[] keyMaterial = new byte[32];
+        generateAesKeyFromPin(buffer, ISO7816.OFFSET_CDATA);
         
-        sha256.reset();
-        sha256.update(pin, (short) 0, PIN_LENGTH);
-        sha256.update(salt, (short) 0, (short) salt.length);
-        sha256.doFinal(pin, (short) 0, (short) 0, keyMaterial, (short) 0);
+        // Initialize balance to 0
+        setBalance(0);
         
-        // Use first 16 bytes as AES key
-        aesKey.setKey(keyMaterial, (short) 0);
-    }
-    
-    // =====================================================
-    // CARD INFORMATION
-    // =====================================================
-    
-    private void getCardId(APDU apdu) {
-        if (!cardInitialized) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-        }
+        // Activate card
+        cardInitialized = true;
+        cardActive = true;
+        pinTryCounter = MAX_PIN_TRIES;
+        pinVerified = true;
         
-        byte[] buffer = apdu.getBuffer();
+        // Return Card ID
         Util.arrayCopy(cardId, (short) 0, buffer, (short) 0, CARD_ID_LENGTH);
         apdu.setOutgoingAndSend((short) 0, CARD_ID_LENGTH);
     }
     
-    private void getPublicKey(APDU apdu) {
+    private void createAvatar(APDU apdu) {
+        if (!cardInitialized || !pinVerified) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+        
+        byte[] buffer = apdu.getBuffer();
+        
+        // Standard APDU - receive data
+        short lc = apdu.setIncomingAndReceive();
+        
+        if (lc > MAX_AVATAR_SIZE) {
+            ISOException.throwIt(ISO7816.SW_FILE_FULL);
+        }
+        
+        // Copy received data
+        Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, avatar, (short) 0, lc);
+        avatarLength = lc;
+        
+        // Return avatar length
+        Util.setShort(buffer, (short) 0, avatarLength);
+        apdu.setOutgoingAndSend((short) 0, (short) 2);
+    }
+    
+    // =====================================================
+    // INS_GET (0x02)
+    // =====================================================
+    
+    private void processGet(APDU apdu, byte p1, byte p2) {
         if (!cardInitialized) {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
         
         byte[] buffer = apdu.getBuffer();
-        short keyLength = rsaPublicKey.getSize();
         
-        // Export public key (modulus + exponent)
-        short modulusLength = rsaPublicKey.getModulus(buffer, (short) 2);
-        buffer[0] = (byte) (modulusLength >> 8);
-        buffer[1] = (byte) (modulusLength & 0xFF);
-        
-        short exponentLength = rsaPublicKey.getExponent(buffer, (short) (2 + modulusLength + 2));
-        buffer[2 + modulusLength] = (byte) (exponentLength >> 8);
-        buffer[2 + modulusLength + 1] = (byte) (exponentLength & 0xFF);
-        
-        short totalLength = (short) (2 + modulusLength + 2 + exponentLength);
-        apdu.setOutgoingAndSend((short) 0, totalLength);
+        switch (p2) {
+            case P2_CARD_ID:
+                Util.arrayCopy(cardId, (short) 0, buffer, (short) 0, CARD_ID_LENGTH);
+                apdu.setOutgoingAndSend((short) 0, CARD_ID_LENGTH);
+                break;
+                
+            case P2_TRY_REMAINING:
+                buffer[0] = pinTryCounter;
+                apdu.setOutgoingAndSend((short) 0, (short) 1);
+                break;
+                
+            case P2_PUBLIC_KEY:
+                short keyLen = serializePublicKey(rsaPublicKey, buffer, (short) 0);
+                apdu.setOutgoingAndSend((short) 0, keyLen);
+                break;
+                
+            case P2_AVATAR:
+                getAvatar(apdu);
+                break;
+                
+            case P2_BALANCE:
+                if (!pinVerified) {
+                    ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+                }
+                getBalance(apdu);
+                break;
+                
+            case P2_INFORMATION:
+                if (!pinVerified) {
+                    ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+                }
+                getInfo(apdu);
+                break;
+                
+            default:
+                ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        }
     }
     
-    // =====================================================
-    // FINANCIAL OPERATIONS
-    // =====================================================
+    private void getAvatar(APDU apdu) {
+        if (avatarLength == 0) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+        
+        byte[] buffer = apdu.getBuffer();
+        
+        // Standard APDU - send data (limited to 256 bytes)
+        short sendLength = avatarLength > 256 ? (short) 256 : avatarLength;
+        Util.arrayCopy(avatar, (short) 0, buffer, (short) 0, sendLength);
+        apdu.setOutgoingAndSend((short) 0, sendLength);
+    }
     
     private void getBalance(APDU apdu) {
-        if (!cardInitialized || !pinVerified) {
-            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
-        }
-        
-        int balance = decryptBalance();
-        
         byte[] buffer = apdu.getBuffer();
-        buffer[0] = (byte) (balance >> 24);
-        buffer[1] = (byte) (balance >> 16);
-        buffer[2] = (byte) (balance >> 8);
-        buffer[3] = (byte) (balance & 0xFF);
         
+        // Decrypt balance
+        aesDecode(encryptedBalance, (short) 0, (short) 16, aesKey, buffer, (short) 0);
         apdu.setOutgoingAndSend((short) 0, (short) 4);
     }
     
-    private void topupBalance(APDU apdu) {
+    private void getInfo(APDU apdu) {
+        if (encryptedInfoLength == 0) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+        
+        byte[] buffer = apdu.getBuffer();
+        
+        // Decrypt info
+        short len = aesDecode(encryptedInfo, (short) 0, encryptedInfoLength, aesKey, buffer, (short) 0);
+        apdu.setOutgoingAndSend((short) 0, len);
+    }
+    
+    // =====================================================
+    // INS_UPDATE (0x03)
+    // =====================================================
+    
+    private void processUpdate(APDU apdu, byte p1, byte p2) {
+        switch (p1) {
+            case P1_PIN:
+                updatePin(apdu);
+                break;
+            case P1_CITIZEN_INFO:
+                if (p2 == P2_AVATAR) {
+                    createAvatar(apdu);  // Same as create
+                } else if (p2 == P2_INFORMATION) {
+                    updateInfo(apdu);
+                } else if (p2 == P2_BALANCE) {
+                    updateBalance(apdu);
+                }
+                break;
+            case P1_SIGNATURE:
+                signData(apdu);
+                break;
+            case P1_ACTIVATE_CARD:
+                activateCard(apdu);
+                break;
+            case P1_DEACTIVATE_CARD:
+                deactivateCard(apdu);
+                break;
+            case P1_FORGET_PIN:
+                forgetPin(apdu);
+                break;
+            default:
+                ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        }
+    }
+    
+    private void updatePin(APDU apdu) {
         if (!cardInitialized || !pinVerified) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
@@ -443,38 +432,32 @@ public class citizen_applet extends Applet {
         byte[] buffer = apdu.getBuffer();
         short lc = apdu.setIncomingAndReceive();
         
-        if (lc < 4) {
+        if (lc != PIN_LENGTH * 2) {  // Old PIN + New PIN
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
         
-        // Get amount from APDU
-        int amount = ((buffer[ISO7816.OFFSET_CDATA] & 0xFF) << 24) |
-                    ((buffer[ISO7816.OFFSET_CDATA + 1] & 0xFF) << 16) |
-                    ((buffer[ISO7816.OFFSET_CDATA + 2] & 0xFF) << 8) |
-                    (buffer[ISO7816.OFFSET_CDATA + 3] & 0xFF);
+        // Verify old PIN
+        byte[] oldPinHash = new byte[16];
+        md5.reset();
+        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, oldPinHash, (short) 0);
         
-        if (amount <= 0) {
-            ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+        if (Util.arrayCompare(pinHash, (short) 0, oldPinHash, (short) 0, (short) 16) != 0) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
         
-        // Update balance
-        int currentBalance = decryptBalance();
-        int newBalance = currentBalance + amount;
-        setBalance(newBalance);
+        // Hash new PIN
+        md5.reset();
+        md5.doFinal(buffer, (short) (ISO7816.OFFSET_CDATA + PIN_LENGTH), PIN_LENGTH, pinHash, (short) 0);
         
-        // Add transaction record
-        addTransactionRecord((byte) 0x01, amount, newBalance); // 0x01 = TOPUP
+        // Generate new AES key
+        generateAesKeyFromPin(buffer, (short) (ISO7816.OFFSET_CDATA + PIN_LENGTH));
         
-        // Return new balance
-        buffer[0] = (byte) (newBalance >> 24);
-        buffer[1] = (byte) (newBalance >> 16);
-        buffer[2] = (byte) (newBalance >> 8);
-        buffer[3] = (byte) (newBalance & 0xFF);
-        
-        apdu.setOutgoingAndSend((short) 0, (short) 4);
+        // Return success
+        buffer[0] = (byte) 0x01;
+        apdu.setOutgoingAndSend((short) 0, (short) 1);
     }
     
-    private void makePayment(APDU apdu) {
+    private void updateInfo(APDU apdu) {
         if (!cardInitialized || !pinVerified) {
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
@@ -482,144 +465,287 @@ public class citizen_applet extends Applet {
         byte[] buffer = apdu.getBuffer();
         short lc = apdu.setIncomingAndReceive();
         
-        if (lc < 4) {
+        if (lc > MAX_INFO_LENGTH) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
         
-        // Get amount from APDU
-        int amount = ((buffer[ISO7816.OFFSET_CDATA] & 0xFF) << 24) |
-                    ((buffer[ISO7816.OFFSET_CDATA + 1] & 0xFF) << 16) |
-                    ((buffer[ISO7816.OFFSET_CDATA + 2] & 0xFF) << 8) |
-                    (buffer[ISO7816.OFFSET_CDATA + 3] & 0xFF);
+        // Encrypt info
+        encryptedInfoLength = aesEncode(buffer, ISO7816.OFFSET_CDATA, lc, aesKey, encryptedInfo);
         
-        if (amount <= 0) {
+        // Return success
+        buffer[0] = (byte) 0x01;
+        apdu.setOutgoingAndSend((short) 0, (short) 1);
+    }
+    
+    private void updateBalance(APDU apdu) {
+        if (!cardInitialized || !pinVerified) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+        
+        byte[] buffer = apdu.getBuffer();
+        short lc = apdu.setIncomingAndReceive();
+        
+        if (lc < 5) {  // 1 byte type + 4 bytes amount
+            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        }
+        
+        byte type = buffer[ISO7816.OFFSET_CDATA];  // 0x01 = topup, 0x02 = payment
+        int amount = getInt(buffer, (short) (ISO7816.OFFSET_CDATA + 1));
+        
+        // Get current balance
+        aesDecode(encryptedBalance, (short) 0, (short) 16, aesKey, tempBuffer, (short) 0);
+        int currentBalance = getInt(tempBuffer, (short) 0);
+        
+        int newBalance;
+        if (type == 0x01) {  // Topup
+            newBalance = currentBalance + amount;
+        } else if (type == 0x02) {  // Payment
+            if (currentBalance < amount) {
+                ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+            }
+            newBalance = currentBalance - amount;
+        } else {
             ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+            return;
         }
         
-        // Check balance
-        int currentBalance = decryptBalance();
-        if (currentBalance < amount) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED); // Insufficient funds
-        }
-        
-        // Update balance
-        int newBalance = currentBalance - amount;
         setBalance(newBalance);
         
-        // Add transaction record
-        addTransactionRecord((byte) 0x02, amount, newBalance); // 0x02 = PAYMENT
-        
         // Return new balance
-        buffer[0] = (byte) (newBalance >> 24);
-        buffer[1] = (byte) (newBalance >> 16);
-        buffer[2] = (byte) (newBalance >> 8);
-        buffer[3] = (byte) (newBalance & 0xFF);
-        
+        putInt(buffer, (short) 0, newBalance);
         apdu.setOutgoingAndSend((short) 0, (short) 4);
+    }
+    
+    private void signData(APDU apdu) {
+        if (!cardInitialized || !pinVerified) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+        
+        byte[] buffer = apdu.getBuffer();
+        short lc = apdu.setIncomingAndReceive();
+        
+        // Sign data with RSA private key
+        short sigLen = rsaSign(rsaPrivateKey, buffer, ISO7816.OFFSET_CDATA, lc, buffer, (short) 0);
+        
+        apdu.setOutgoingAndSend((short) 0, sigLen);
+    }
+    
+    private void activateCard(APDU apdu) {
+        if (!cardInitialized) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+        
+        // Require PIN verification
+        byte[] buffer = apdu.getBuffer();
+        short lc = apdu.setIncomingAndReceive();
+        
+        if (lc == PIN_LENGTH) {
+            // Verify PIN first
+            byte[] providedPinHash = new byte[16];
+            md5.reset();
+            md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, providedPinHash, (short) 0);
+            
+            if (Util.arrayCompare(pinHash, (short) 0, providedPinHash, (short) 0, (short) 16) == 0) {
+                cardActive = true;
+                pinVerified = true;
+                pinTryCounter = MAX_PIN_TRIES;
+                generateAesKeyFromPin(buffer, ISO7816.OFFSET_CDATA);
+                
+                buffer[0] = (byte) 0x01;
+                apdu.setOutgoingAndSend((short) 0, (short) 1);
+                return;
+            }
+        }
+        
+        ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+    }
+    
+    private void deactivateCard(APDU apdu) {
+        if (!cardInitialized || !pinVerified) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+        
+        cardActive = false;
+        pinVerified = false;
+        
+        byte[] buffer = apdu.getBuffer();
+        buffer[0] = (byte) 0x01;
+        apdu.setOutgoingAndSend((short) 0, (short) 1);
+    }
+    
+    private void forgetPin(APDU apdu) {
+        // Admin function - reset PIN with master key
+        // In real implementation, would require admin authentication
+        byte[] buffer = apdu.getBuffer();
+        short lc = apdu.setIncomingAndReceive();
+        
+        if (lc != PIN_LENGTH) {
+            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+        }
+        
+        // Set new PIN
+        md5.reset();
+        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, pinHash, (short) 0);
+        
+        pinTryCounter = MAX_PIN_TRIES;
+        
+        buffer[0] = (byte) 0x01;
+        apdu.setOutgoingAndSend((short) 0, (short) 1);
+    }
+    
+    // =====================================================
+    // INS_RESET_TRY_PIN (0x10)
+    // =====================================================
+    
+    private void resetPinTries(APDU apdu) {
+        // Admin function - would require authentication in production
+        pinTryCounter = MAX_PIN_TRIES;
+        
+        byte[] buffer = apdu.getBuffer();
+        buffer[0] = pinTryCounter;
+        apdu.setOutgoingAndSend((short) 0, (short) 1);
     }
     
     // =====================================================
     // HELPER METHODS
     // =====================================================
     
-    private int decryptBalance() {
-        // Decrypt balance using AES
-        byte[] decryptedData = new byte[16];
+    private void generateCardId() {
+        byte[] prefix = {
+            (byte)'C', (byte)'I', (byte)'T', (byte)'I', (byte)'Z', (byte)'E', (byte)'N', (byte)'-'
+        };
         
-        try {
-            aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
-            aesCipher.doFinal(encryptedBalance, (short) 0, (short) 16, decryptedData, (short) 0);
-        } catch (CryptoException e) {
-            return 0;
+        short offset = 0;
+        Util.arrayCopy(prefix, (short) 0, cardId, offset, (short) prefix.length);
+        offset += prefix.length;
+        
+        // Generate random bytes for unique ID
+        byte[] randomBytes = new byte[12];
+        randomGenerator.generateData(randomBytes, (short) 0, (short) 12);
+        
+        // Convert to hex string
+        for (short i = 0; i < 12; i++) {
+            cardId[offset++] = getHexChar((byte) ((randomBytes[i] >> 4) & 0x0F));
+            cardId[offset++] = getHexChar((byte) (randomBytes[i] & 0x0F));
         }
+    }
+    
+    private byte getHexChar(byte value) {
+        if (value < 10) {
+            return (byte) ('0' + value);
+        } else {
+            return (byte) ('A' + value - 10);
+        }
+    }
+    
+    private void generateAesKeyFromPin(byte[] pin, short offset) {
+        // Derive AES key from PIN using MD5
+        byte[] keyMaterial = new byte[16];
+        md5.reset();
+        md5.update(pin, offset, PIN_LENGTH);
         
-        return ((decryptedData[0] & 0xFF) << 24) |
-               ((decryptedData[1] & 0xFF) << 16) |
-               ((decryptedData[2] & 0xFF) << 8) |
-               (decryptedData[3] & 0xFF);
+        // Add salt
+        byte[] salt = {(byte)'C', (byte)'I', (byte)'T', (byte)'I', (byte)'Z', (byte)'E', (byte)'N'};
+        md5.doFinal(salt, (short) 0, (short) salt.length, keyMaterial, (short) 0);
+        
+        aesKey.setKey(keyMaterial, (short) 0);
     }
     
     private void setBalance(int balance) {
-        // Encrypt balance using AES
-        byte[] balanceData = new byte[16]; // 4 bytes data + 12 bytes padding
+        tempBuffer[0] = (byte) (balance >> 24);
+        tempBuffer[1] = (byte) (balance >> 16);
+        tempBuffer[2] = (byte) (balance >> 8);
+        tempBuffer[3] = (byte) (balance & 0xFF);
         
-        balanceData[0] = (byte) (balance >> 24);
-        balanceData[1] = (byte) (balance >> 16);
-        balanceData[2] = (byte) (balance >> 8);
-        balanceData[3] = (byte) (balance & 0xFF);
+        // Pad to 16 bytes
+        Util.arrayFillNonAtomic(tempBuffer, (short) 4, (short) 12, (byte) 0x00);
         
-        // Fill padding with random data
-        randomGenerator.generateData(balanceData, (short) 4, (short) 12);
-        
-        try {
-            aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
-            aesCipher.doFinal(balanceData, (short) 0, (short) 16, encryptedBalance, (short) 0);
-        } catch (CryptoException e) {
-            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        aesEncode(tempBuffer, (short) 0, (short) 16, aesKey, encryptedBalance);
+    }
+    
+    private int getInt(byte[] buffer, short offset) {
+        return ((buffer[offset] & 0xFF) << 24) |
+               ((buffer[(short)(offset + 1)] & 0xFF) << 16) |
+               ((buffer[(short)(offset + 2)] & 0xFF) << 8) |
+               (buffer[(short)(offset + 3)] & 0xFF);
+    }
+    
+    private void putInt(byte[] buffer, short offset, int value) {
+        buffer[offset] = (byte) (value >> 24);
+        buffer[(short)(offset + 1)] = (byte) (value >> 16);
+        buffer[(short)(offset + 2)] = (byte) (value >> 8);
+        buffer[(short)(offset + 3)] = (byte) (value & 0xFF);
+    }
+    
+    // =====================================================
+    // AES HELPER METHODS
+    // =====================================================
+    
+    private short applyPadding(byte[] input, short offset, short length) {
+        short paddedLength = (short) (length + (16 - (length % 16)));
+        Util.arrayFillNonAtomic(input, (short) (length + offset), (short) (paddedLength - length), (byte) 0x00);
+        return paddedLength;
+    }
+    
+    private short removePadding(byte[] output, short length) {
+        byte paddingValue = 0x00;
+        short paddingLength = 0;
+        for (short i = (short) (length - 1); i >= 0; i--) {
+            if (output[i] != paddingValue) {
+                break;
+            }
+            paddingLength++;
         }
+        return (short) (length - paddingLength);
     }
     
-    private void addTransactionRecord(byte type, int amount, int newBalance) {
-        // Simple transaction logging (in real implementation, use proper timestamp)
-        if (transactionCount >= MAX_TRANSACTIONS) {
-            // Shift array left to make room for new transaction
-            Util.arrayCopy(encryptedTransactionHistory, TRANSACTION_RECORD_SIZE, 
-                          encryptedTransactionHistory, (short) 0, 
-                          (short) ((MAX_TRANSACTIONS - 1) * TRANSACTION_RECORD_SIZE));
-            transactionCount = (byte) (MAX_TRANSACTIONS - 1);
+    private short aesEncode(byte[] input, short offset, short length, AESKey key, byte[] output) {
+        if (length < 1) {
+            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         }
-        
-        // Create transaction record
-        byte[] record = new byte[TRANSACTION_RECORD_SIZE];
-        short offset = 0;
-        
-        // Timestamp (8 bytes) - simplified
-        randomGenerator.generateData(record, offset, (short) 8);
-        offset += 8;
-        
-        // Type (1 byte)
-        record[offset++] = type;
-        
-        // Amount (4 bytes)
-        record[offset++] = (byte) (amount >> 24);
-        record[offset++] = (byte) (amount >> 16);
-        record[offset++] = (byte) (amount >> 8);
-        record[offset++] = (byte) (amount & 0xFF);
-        
-        // New Balance (4 bytes)
-        record[offset++] = (byte) (newBalance >> 24);
-        record[offset++] = (byte) (newBalance >> 16);
-        record[offset++] = (byte) (newBalance >> 8);
-        record[offset++] = (byte) (newBalance & 0xFF);
-        
-        // Reference (3 bytes) - simplified
-        randomGenerator.generateData(record, offset, (short) 3);
-        
-        // Store encrypted record
-        short recordOffset = (short) (transactionCount * TRANSACTION_RECORD_SIZE);
-        Util.arrayCopy(record, (short) 0, encryptedTransactionHistory, recordOffset, TRANSACTION_RECORD_SIZE);
-        
-        transactionCount++;
+        short paddedLength = applyPadding(input, offset, length);
+        aesCipher.init(key, Cipher.MODE_ENCRYPT);
+        aesCipher.doFinal(input, offset, paddedLength, output, (short) 0);
+        return paddedLength;
     }
     
-    // Placeholder methods for other operations
-    private void getCardInfo(APDU apdu) {
-        // TODO: Implement encrypted personal info retrieval
-        ISOException.throwIt(ISO7816.SW_FUNC_NOT_SUPPORTED);
+    private short aesDecode(byte[] input, short inOffset, short inLength, AESKey key, byte[] output, short outOffset) {
+        if ((short) (inLength % 16) != 0) {
+            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+        }
+        aesCipher.init(key, Cipher.MODE_DECRYPT);
+        aesCipher.doFinal(input, inOffset, inLength, output, outOffset);
+        return removePadding(output, inLength);
     }
     
-    private void updateCardInfo(APDU apdu) {
-        // TODO: Implement encrypted personal info update
-        ISOException.throwIt(ISO7816.SW_FUNC_NOT_SUPPORTED);
+    // =====================================================
+    // RSA HELPER METHODS
+    // =====================================================
+    
+    private short rsaSign(RSAPrivateKey privateKey, byte[] input, short inputOffset, short inputLength, 
+                         byte[] output, short outputOffset) {
+        rsaSignature.init(privateKey, Signature.MODE_SIGN);
+        return rsaSignature.sign(input, inputOffset, inputLength, output, outputOffset);
     }
     
-    private void getTransactionHistory(APDU apdu) {
-        // TODO: Implement encrypted transaction history retrieval
-        ISOException.throwIt(ISO7816.SW_FUNC_NOT_SUPPORTED);
-    }
-    
-    private void resetCard(APDU apdu) {
-        // TODO: Implement card reset (admin function)
-        ISOException.throwIt(ISO7816.SW_FUNC_NOT_SUPPORTED);
+    private static short serializePublicKey(RSAPublicKey publicKey, byte[] buffer, short offset) {
+        short currentOffset = offset;
+        byte[] tempBuffer = new byte[128];
+        
+        // Get exponent
+        short expLength = publicKey.getExponent(tempBuffer, (short) 0);
+        Util.setShort(buffer, currentOffset, expLength);
+        currentOffset += 2;
+        Util.arrayCopy(tempBuffer, (short) 0, buffer, currentOffset, expLength);
+        currentOffset += expLength;
+        
+        // Get modulus
+        short modLength = publicKey.getModulus(tempBuffer, (short) 0);
+        Util.setShort(buffer, currentOffset, modLength);
+        currentOffset += 2;
+        Util.arrayCopy(tempBuffer, (short) 0, buffer, currentOffset, modLength);
+        currentOffset += modLength;
+        
+        return (short) (currentOffset - offset);
     }
 }

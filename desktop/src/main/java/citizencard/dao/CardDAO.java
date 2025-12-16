@@ -1,4 +1,4 @@
-package citizencard;
+package citizencard.dao;
 
 import java.sql.*;
 import java.io.File;

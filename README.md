@@ -1,288 +1,249 @@
-# Hệ thống Quản lý Thẻ Cư dân
+﻿# Citizen Card Management System
 
-Hệ thống quản lý thẻ cư dân sử dụng **javax.smartcardio** để kết nối với **JCIDE terminal**. Desktop app JavaFX tích hợp toàn bộ backend logic (không cần HTTP server riêng).
+A smart card-based citizen management system using JavaCard applet and JavaFX desktop application.
 
-## 🏗️ Kiến trúc hệ thống
+## ðŸŒŸ Features
+
+- **Smart Card Integration**: JavaCard 2.2.1 applet with AES-128 & RSA-1024 encryption
+- **Desktop Application**: JavaFX-based UI with real-time card communication
+- **Secure Authentication**: PIN-based authentication with MD5 hashing (5 retry attempts)
+- **Photo Management**: Chunked photo transfer (8KB storage, 200-byte chunks)
+- **Balance Operations**: Encrypted balance management with transaction logging
+- **Database Integration**: H2 embedded database for card registry
+- **Inline Validation**: Real-time form validation with user-friendly error messages
+
+## ðŸ—ï¸ Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│  Desktop App (JavaFX)                   │
-│  ┌───────────────────────────────────┐  │
-│  │  UI Components                    │  │
-│  │  └─> CitizenCardService (Local)   │  │
-│  └───────────────────────────────────┘  │
-│              │                           │
-│              │ Direct Method Calls       │
-│              │ (Same JVM, no HTTP)       │
-│              ▼                           │
-│  ┌───────────────────────────────────┐  │
-│  │  Backend Service                   │  │
-│  │  - Business Logic                  │  │
-│  │  - DAO Layer                       │  │
-│  │  - RealCardClient                  │  │
-│  └───────────────────────────────────┘  │
-│              │                           │
-│              │ SQLite (File-based)       │
-│              ▼                           │
-│  ┌───────────────────────────────────┐  │
-│  │  SQLite Database                   │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-              │
-              │ javax.smartcardio
-              │ (ISO 7816 T=1)
-              ▼
-┌─────────────────────────────────────────┐
-│  JCIDE Terminal                         │
-│  (JavaCard Applet)                      │
-└─────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  Desktop App (JavaFX)                   â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚  â”‚  Controllers (UI Layer)           â”‚  â”‚
+â”‚  â”‚  â””â”€> CardService                  â”‚  â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚              â”‚                           â”‚
+â”‚              â”‚ javax.smartcardio         â”‚
+â”‚              â”‚ (ISO 7816-4 APDU)         â”‚
+â”‚              â–¼                           â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚  â”‚  H2 Database (Embedded)           â”‚  â”‚
+â”‚  â”‚  - Card Registry                  â”‚  â”‚
+â”‚  â”‚  - Transaction Logs               â”‚  â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+              â”‚
+              â”‚ APDU Commands
+              â–¼
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  JavaCard Applet (Smart Card)          â”‚
+â”‚  - AES-128 Encryption                  â”‚
+â”‚  - RSA-1024 Signatures                 â”‚
+â”‚  - PIN Management                      â”‚
+â”‚  - Photo Storage (8KB)                 â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
-## 📦 Cấu trúc Project
+## ðŸ“¦ Project Structure
 
 ```
 citizen_card/
-├── desktop/                    # Desktop application (All-in-one module)
-│   ├── src/main/java/
-│   │   └── com/citizencard/
-│   │       ├── app/                   # Application entry point
-│   │       │   └── MainApp.java      # JavaFX main
-│   │       ├── ui/                    # Presentation layer
-│   │       │   ├── views/             # Main views
-│   │       │   │   ├── LoginView.java
-│   │       │   │   ├── ResidentDashboard.java
-│   │       │   │   └── AdminDashboard.java
-│   │       │   └── components/        # Reusable UI components
-│   │       │       ├── PinInputComponent.java
-│   │       │       ├── UITheme.java
-│   │       │       └── NotificationService.java
-│   │       ├── service/               # Business logic layer
-│   │       │   └── CitizenCardService.java
-│   │       ├── dao/                   # Data access layer
-│   │       │   ├── ResidentDAO.java
-│   │       │   ├── TransactionDAO.java
-│   │       │   ├── InvoiceDAO.java
-│   │       │   └── ParkingDAO.java
-│   │       ├── model/                 # Domain models (chỉ 1 bộ)
-│   │       │   ├── Resident.java
-│   │       │   ├── Transaction.java
-│   │       │   ├── Invoice.java
-│   │       │   └── Parking.java
-│   │       ├── card/                  # Smartcard communication layer
-│   │       │   ├── CardService.java   # Xử lý các INS commands
-│   │       │   └── RealCardClient.java # javax.smartcardio client
-│   │       ├── database/              # Database management
-│   │       │   └── DatabaseManager.java
-│   │       ├── validation/            # Validation logic
-│   │       │   └── ValidationService.java
-│   │       └── util/                  # Utilities
-│   │           └── ModelConverter.java
-│   ├── data/                   # Data files (auto-generated)
-│   │   └── citizen_card.db     # SQLite database
-│   └── pom.xml
-├── jcardsim-applet/           # JavaCard applet cho JCIDE
-│   └── src/citizen/
-│       └── citizen.java      # Applet code (with RSA encryption)
-└── README.md
+â”œâ”€â”€ applet/                          # JavaCard Applet
+â”‚   â”œâ”€â”€ src/citizen_applet/
+â”‚   â”‚   â””â”€â”€ citizen_applet.java     # Main applet (749 lines, all-in-one)
+â”‚   â”œâ”€â”€ bin/                         # Compiled .class and .cap files
+â”‚   â””â”€â”€ applet.jcproj               # JCIDE project file
+â”‚
+â”œâ”€â”€ desktop/                         # JavaFX Desktop Application
+â”‚   â”œâ”€â”€ src/main/java/citizencard/
+â”‚   â”‚   â”œâ”€â”€ controller/             # UI Controllers
+â”‚   â”‚   â”‚   â”œâ”€â”€ AdminDashboardController.java
+â”‚   â”‚   â”‚   â”œâ”€â”€ CitizenDashboardController.java
+â”‚   â”‚   â”‚   â”œâ”€â”€ DemoWorkflowController.java
+â”‚   â”‚   â”‚   â”œâ”€â”€ LoginViewController.java
+â”‚   â”‚   â”‚   â””â”€â”€ PhotoManagementController.java
+â”‚   â”‚   â”œâ”€â”€ service/                # Card communication
+â”‚   â”‚   â”‚   â””â”€â”€ CardService.java
+â”‚   â”‚   â”œâ”€â”€ dao/                    # Database access
+â”‚   â”‚   â”‚   â””â”€â”€ CardDAO.java
+â”‚   â”‚   â”œâ”€â”€ model/                  # Data models
+â”‚   â”‚   â””â”€â”€ util/                   # Utilities
+â”‚   â”‚       â”œâ”€â”€ DatabaseViewer.java
+â”‚   â”‚       â”œâ”€â”€ DialogUtils.java
+â”‚   â”‚       â”œâ”€â”€ PhotoUtils.java
+â”‚   â”‚       â””â”€â”€ PinInputDialog.java
+â”‚   â”œâ”€â”€ src/main/resources/
+â”‚   â”‚   â””â”€â”€ css/
+â”‚   â”‚       â””â”€â”€ styles.css          # Unified design system (450 lines)
+â”‚   â”œâ”€â”€ data/                       # H2 Database (auto-generated)
+â”‚   â”‚   â”œâ”€â”€ citizen_card.mv.db
+â”‚   â”‚   â””â”€â”€ citizen_card.trace.db
+â”‚   â””â”€â”€ pom.xml                     # Maven configuration
+â”‚
+â”œâ”€â”€ README.md                        # This file
+â”œâ”€â”€ APPLET_STRUCTURE_GUIDE.md       # Applet architecture reference
+â”œâ”€â”€ APDU_COMMANDS_V2.md             # APDU command reference
+â”œâ”€â”€ DATABASE_VIEWER_GUIDE.md        # Database viewer guide
+â”œâ”€â”€ view-database.bat               # Database viewer (Windows)
+â””â”€â”€ view-database.sh                # Database viewer (Linux/Mac)
 ```
 
-**Lưu ý:**
-- ✅ **Cấu trúc theo chuẩn Layered Architecture** - rõ ràng, dễ maintain
-- ✅ **Chỉ 1 bộ model** - không trùng lặp
-- ✅ Database file `citizen_card.db` nằm trong thư mục `desktop/data/`
-- ✅ Tất cả code chạy trong cùng một module, không cần HTTP server
-- 🔐 **Applet hỗ trợ RSA encryption** - Private key được lưu trong thẻ
+## ðŸš€ Quick Start
 
-## 🚀 Hướng dẫn chạy
+### Prerequisites
+- **Java 17+** (JDK 21 recommended)
+- **Maven 3.6+**
+- **JCIDE** (for JavaCard applet development)
+- **Smart Card Reader** (for physical card testing)
 
-### Yêu cầu
-- Java 17+ (khuyến nghị JDK 21)
-- IntelliJ IDEA (Community hoặc Ultimate)
-- JCIDE (để chạy JavaCard applet)
-- Maven 3.6+ (tích hợp sẵn trong IntelliJ - không cần cài riêng)
+### 1. Build Applet
 
-### Bước 1: Chạy JCIDE và Load Applet
+```bash
+# Using JCIDE
+1. Open applet/applet.jcproj in JCIDE
+2. Press F7 to build
+3. Output: applet/bin/citizen_applet.cap
 
-1. Mở **JCIDE**
-2. Load applet từ `jcardsim-applet/src/citizen/citizen.java`
-3. **Build** project (Ctrl+B)
-4. **Debug/Run** applet (F11) để mở terminal
-5. **Quan trọng**: Đảm bảo terminal đang mở trong JCIDE
-
-**Lưu ý**: Terminal phải được mở trong JCIDE để Desktop App kết nối trực tiếp (không cần JCardSimServer hay server mô phỏng nào khác).
-
-### Bước 2: Chạy Desktop App
-
-**Trong IntelliJ:**
-1. Mở project: `File → Open → citizen_card/desktop`
-2. IntelliJ tự động import Maven project
-3. Chạy: `Run → Desktop App` (hoặc `Shift+F10`)
-4. ✅ **Xong!** - Không cần chạy Maven commands
-
-Desktop App sẽ:
-- Tự động khởi tạo Backend service (trong cùng module)
-- Tự động khởi tạo Database (nếu chưa có)
-- Tự động quét và kết nối với JCIDE terminal
-- Hiển thị màn hình đăng nhập
-
-**Lưu ý:**
-- ✅ **KHÔNG cần** chạy Maven commands qua terminal
-- ✅ **KHÔNG cần** mở port nào (chỉ local)
-- ✅ IntelliJ tự động build và chạy
-
-### Sử dụng
-
-**Đăng nhập Cư dân:**
-1. Click **"👤 Đăng nhập Cư dân"**
-2. Hệ thống tự động quét và kết nối với JCIDE terminal
-3. Tự động SELECT applet và đọc Card ID
-4. Nhập PIN khi được yêu cầu
-5. Vào Dashboard cư dân
-
-**Đăng nhập Admin:**
-1. Click **"🔐 Đăng nhập Admin"**
-2. Vào Dashboard admin trực tiếp
-
-## 📝 Lưu ý về Kiến trúc
-
-Hệ thống sử dụng **Local Communication** - Desktop App gọi trực tiếp Backend service methods trong cùng JVM, **KHÔNG qua HTTP REST API**. Điều này giúp:
-- ✅ **KHÔNG cần HTTP server** (không cần mở port 8080 hay bất kỳ port nào)
-- ✅ **KHÔNG cần backend server riêng** - tất cả code backend được tích hợp trong desktop module
-- ✅ Desktop App gọi **trực tiếp database** qua DAO classes (không qua API)
-- ✅ Nhanh hơn (không có network overhead)
-- ✅ Đơn giản hơn (direct method calls trong cùng JVM)
-
-**Kết nối với JCIDE terminal** qua **javax.smartcardio** (ISO 7816 T=1 protocol).
-
-### 🔄 Luồng dữ liệu
-
-```
-Desktop UI → CitizenCardService → DAO Classes → SQLite Database
-                ↓
-         RealCardClient → javax.smartcardio → JCIDE Terminal
+# Or using command line
+cd applet
+javac -g -target 1.2 -source 1.2 \
+  -d bin \
+  -classpath "path/to/api.jar" \
+  src/citizen_applet/citizen_applet.java
 ```
 
-**Tất cả đều chạy trong cùng một JVM process, không có network communication.**
+### 2. Run Desktop Application
 
-### 💾 Lưu trữ Dữ liệu
+```bash
+cd desktop
+mvn clean compile
+mvn javafx:run
+```
 
-**JCIDE Terminal (JavaCard Applet):**
-- Dữ liệu thẻ được lưu trong applet (persistent trong card memory)
-- Dữ liệu được lưu khi applet chạy trong JCIDE
-- Dữ liệu chỉ mất khi **reload applet** trong JCIDE
+### 3. View Database (Optional)
 
-**SQLite Database:**
-- Lưu trong file `desktop/data/citizen_card.db` (persistent)
-- **Không mất** khi restart Desktop App
-- Dữ liệu cư dân, giao dịch, hóa đơn được lưu vĩnh viễn
-- Tự động tạo khi chạy lần đầu (dựa trên `database/schema.sql`)
-- **Không lưu PIN** - PIN được xác thực trực tiếp bởi thẻ
-- **Lưu Public Key** - để mã hóa dữ liệu gửi đến thẻ
+```bash
+# Windows
+view-database.bat
 
-### Service Methods
+# Linux/Mac
+./view-database.sh
+```
 
-Desktop App gọi trực tiếp các methods trong `CitizenCardService` (trong cùng module):
-- `loginByCard()` - Đăng nhập bằng thẻ
-- `verifyPin(cardId, pin)` - Xác thực PIN
-- `topUp(cardId, amount)` - Nạp tiền
-- `payInvoice(cardId, invoiceId)` - Thanh toán hóa đơn
-- `initializeCard(...)` - Khởi tạo thẻ (Admin)
-- Và nhiều methods khác...
+## ðŸ’» Usage
 
-Xem `desktop/src/main/java/com/citizencard/service/CitizenCardService.java` để biết đầy đủ các methods.
+### Admin Dashboard
+- Register new cards
+- Upload citizen photos
+- Manage card status
+- View all registered cards
 
-### ❓ Tại sao không cần Backend Server?
+### Citizen Dashboard
+- View card information
+- Check balance
+- View transaction history
+- Update personal information
 
-Vì chạy **hoàn toàn local**, Desktop App có thể:
-- Gọi trực tiếp `CitizenCardService` methods (trong cùng JVM)
-- Truy cập trực tiếp SQLite database qua JDBC (file-based, không cần server)
-- Kết nối trực tiếp với JCIDE terminal qua `javax.smartcardio` (local device)
+## 🔐 Security Features
 
-**Không cần HTTP API** vì không có network communication giữa các components.
+### Applet Security
+- **PIN Authentication**: MD5-hashed PIN with 5 retry attempts
+- **AES-128 Encryption**: All sensitive data encrypted (balance, personal info)
+- **RSA-1024 Signatures**: Digital signatures for critical operations
+- **Secure Key Storage**: Private keys never leave the card
+- **Auto-deactivation**: Card locks after 5 failed PIN attempts
 
-## 📋 INS Commands
+### Data Storage
+- **Smart Card**: Encrypted personal data, balance, photo (8KB)
+- **H2 Database**: Card registry, public keys, transaction logs
+- **No Sensitive Data**: PIN and private keys never stored in database
 
-`CardService` sử dụng các INS code sau để giao tiếp với JavaCard applet trong JCIDE:
+## ðŸ”§ Technical Details
 
-| INS | Chức năng |
-|-----|-----------|
-| A4  | SELECT APPLET |
-| 29  | CHECK CARD CREATED |
-| 18  | CLEAR CARD |
-| 20  | UPDATE CUSTOMER INFO |
-| 13  | GET CUSTOMER INFO |
-| 14  | GET BALANCE |
-| 16  | UPDATE BALANCE |
-| 26  | UPDATE CARD ID |
-| 27  | GET CARD ID |
-| 21  | UPDATE PIN |
-| 24  | VERIFY PIN |
-| 25  | UNBLOCK PIN |
-| 28  | CHECK PIN STATUS |
-| 22  | UPDATE PICTURE |
-| 23  | GET PICTURE |
-| 2A  | GET PUBLIC KEY (RSA) |
+### JavaCard Applet
+- **Version**: JavaCard 2.2.1
+- **Crypto**: AES-128-ECB, RSA-1024, MD5
+- **Storage**: 8KB photo buffer
+- **Transfer**: Chunked transfer (200-byte chunks)
+- **Size**: 749 lines (single file)
 
-## 🔐 Protocol
+### Desktop Application
+- **Framework**: JavaFX 20.0.1
+- **Build Tool**: Maven 3.x
+- **Database**: H2 (embedded)
+- **Card I/O**: javax.smartcardio
+- **Protocol**: ISO 7816-4 APDU
 
-Sử dụng **ISO 7816 T=1** protocol qua `javax.smartcardio`:
-- **SELECT APPLET**: `00 A4 04 00 [AID length] [AID]`
-- **APDU Commands**: `CLA INS P1 P2 [Lc] [Data] [Le]`
-- **Response**: `[Data] SW1 SW2` (0x9000 = success)
+### Communication Protocol
+```
+Desktop App â†’ javax.smartcardio â†’ APDU Commands â†’ JavaCard Applet
+                                                         â†“
+                                                   Card Memory
+```
 
-Xem file `QUICK_START.md` để biết hướng dẫn nhanh về cách chạy với JCIDE.
+## ðŸ“‹ APDU Commands
 
-## 📊 Database Schema
+The applet supports the following INS codes (see [APDU_COMMANDS_V2.md](APDU_COMMANDS_V2.md) for details):
 
-Schema database được lưu trong `desktop/src/main/resources/database/schema.sql` và được tự động load khi khởi tạo database.
+| INS | Command | Description |
+|-----|---------|-------------|
+| 0x50 | START_PHOTO_UPLOAD | Initialize photo upload session |
+| 0x51 | UPLOAD_PHOTO_CHUNK | Upload photo chunk (200 bytes) |
+| 0x52 | FINISH_PHOTO_UPLOAD | Finalize photo upload |
+| 0x53 | GET_PHOTO_SIZE | Get stored photo size |
+| 0x54 | GET_PHOTO_CHUNK | Download photo chunk |
+| 0x20 | VERIFY_PIN | Authenticate with PIN |
+| 0x21 | CHANGE_PIN | Change PIN |
+| 0x22 | GET_BALANCE | Get encrypted balance |
+| 0x23 | UPDATE_BALANCE | Update balance (topup/payment) |
+| 0x24 | GET_CARD_ID | Get card identifier |
+| 0x25 | GET_PUBLIC_KEY | Export RSA public key |
+| 0x26 | SIGN_DATA | Create RSA signature |
 
-## 💻 Tài liệu Hướng dẫn
+## ðŸ“š Documentation
 
-**Xem file `QUICK_START.md`** để chạy nhanh (3 bước đơn giản)
+- **[APPLET_STRUCTURE_GUIDE.md](APPLET_STRUCTURE_GUIDE.md)** - Applet architecture and code structure
+- **[APDU_COMMANDS_V2.md](APDU_COMMANDS_V2.md)** - Complete APDU command reference
+- **[DATABASE_VIEWER_GUIDE.md](DATABASE_VIEWER_GUIDE.md)** - Database viewer usage guide
 
-**Xem file `HOW_TO_VIEW_DATABASE.md`** để biết cách xem và quản lý dữ liệu trong SQLite database
+## ðŸ› Troubleshooting
 
-**Các file hướng dẫn khác:**
-- `HUONG_DAN_KHOI_TAO_THE.md` - Hướng dẫn khởi tạo thẻ
-- `HUONG_DAN_VALIDATION.md` - Hướng dẫn về validation
-- `HUONG_DAN_XAC_DINH_CU_DAN.md` - Hướng dẫn xác định cư dân
+### Applet Build Errors
+- Ensure only `citizen_applet.java` exists in `applet/src/citizen_applet/`
+- Check JavaCard API path in classpath
+- Verify JavaCard 2.2.1 compatibility
 
-## ❓ Câu Hỏi Thường Gặp
+### Desktop App Won't Start
+- Run `mvn clean compile` to rebuild
+- Check Java 17+ is installed
+- Verify Maven dependencies are resolved
 
-### Có cần Maven không?
-- ✅ **Có** - để quản lý dependencies (JavaFX, SQLite không có sẵn trong JDK)
-- ✅ **Nhưng KHÔNG cần chạy Maven commands** - IntelliJ tự động xử lý
-- ✅ **Chỉ cần click Run** - IntelliJ tự động build
+### Card Not Detected
+- Check card reader connection
+- Verify card is inserted properly
+- Ensure JCIDE terminal is running (for simulation)
 
-### Có cần mở port hoặc chạy JCardSimServer không?
-- ❌ **KHÔNG cần mở port nào, KHÔNG cần JCardSimServer**
-- ✅ Chỉ cần **JCIDE terminal** (local, không qua network)
-- ✅ Tất cả chạy local trong cùng máy
+### Database Errors
+- Database auto-creates on first run
+- Location: `desktop/data/citizen_card.mv.db`
+- To reset: Delete database files and restart app
+- See [DATABASE_VIEWER_GUIDE.md](DATABASE_VIEWER_GUIDE.md) for details
 
-## 🐛 Troubleshooting
+## ðŸ¤ Contributing
 
-### Desktop App không kết nối được JCIDE terminal
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-- Kiểm tra JCIDE đang chạy và applet đã được load
-- Kiểm tra terminal đã được mở trong JCIDE (F11 để mở terminal)
-- Kiểm tra thẻ đã được "insert" vào terminal trong JCIDE
-- Kiểm tra applet đã được SELECT thành công (xem console logs)
-- Đảm bảo sử dụng protocol T=1 (đã được cấu hình sẵn)
+## ðŸ“„ License
 
-### Desktop app không chạy được
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-- Kiểm tra Maven dependencies đã được resolve
-- Kiểm tra JCIDE đang chạy và terminal đã mở
-- Xem logs trong console để biết lỗi cụ thể
+## ðŸ‘¥ Authors
 
-### Lỗi database
+Educational project for learning JavaCard and smart card development.
 
-- Database sẽ tự động tạo khi chạy lần đầu
-- File database: `desktop/data/citizen_card.db`
-- Nếu cần reset database, xóa file `desktop/data/citizen_card.db` và chạy lại app
-- Xem `HOW_TO_VIEW_DATABASE.md` để biết cách xem dữ liệu trong database
+## ðŸ™ Acknowledgments
 
-## 📝 License
+- JavaCard technology by Oracle
+- JavaFX framework
+- H2 Database Engine
 
-MIT License
 

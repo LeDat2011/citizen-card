@@ -1,4 +1,4 @@
-package citizencard;
+package citizencard.service;
 
 import javax.smartcardio.*;
 import java.io.IOException;

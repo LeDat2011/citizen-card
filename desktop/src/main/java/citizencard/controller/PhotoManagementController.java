@@ -1,0 +1,300 @@
+package citizencard.controller;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.stage.FileChooser;
+import java.io.File;
+
+import citizencard.service.CardService;
+import citizencard.util.PhotoUtils;
+import citizencard.util.DataValidator;
+
+/**
+ * Photo Management Controller
+ * 
+ * Handles photo upload/download to/from smart card
+ */
+public class PhotoManagementController {
+    
+    private CardService cardService;
+    
+    public PhotoManagementController(CardService cardService) {
+        this.cardService = cardService;
+    }
+    
+    /**
+     * Show photo management dialog
+     */
+    public void showPhotoManagement() {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Quản lý ảnh cá nhân");
+        dialog.setHeaderText("📷 Quản lý ảnh trong thẻ thông minh");
+        
+        VBox mainContainer = new VBox(15);
+        mainContainer.setPadding(new Insets(15));
+        mainContainer.setPrefWidth(400);
+        mainContainer.setMaxWidth(400);
+        
+        // Current photo display
+        VBox photoSection = createPhotoDisplaySection();
+        
+        // Action buttons
+        HBox actionButtons = createActionButtons(photoSection);
+        
+        // Info panel
+        VBox infoPanel = createInfoPanel();
+        
+        mainContainer.getChildren().addAll(photoSection, actionButtons, new Separator(), infoPanel);
+        dialog.getDialogPane().setContent(mainContainer);
+        
+        ButtonType closeButton = new ButtonType("Đóng", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().add(closeButton);
+        
+        dialog.getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
+        dialog.showAndWait();
+    }
+    
+    private VBox createPhotoDisplaySection() {
+        VBox photoSection = new VBox(10);
+        photoSection.setAlignment(Pos.CENTER);
+        photoSection.getStyleClass().add("photo-display-section");
+        
+        Label titleLabel = new Label("Ảnh hiện tại trong thẻ");
+        titleLabel.getStyleClass().add("section-title");
+        
+        // Photo display
+        ImageView photoView = new ImageView();
+        photoView.setFitWidth(120);
+        photoView.setFitHeight(150);
+        photoView.setPreserveRatio(true);
+        photoView.getStyleClass().add("photo-display");
+        
+        Label statusLabel = new Label("Đang tải...");
+        statusLabel.getStyleClass().add("photo-status");
+        
+        // Load current photo from card
+        loadCurrentPhoto(photoView, statusLabel);
+        
+        photoSection.getChildren().addAll(titleLabel, photoView, statusLabel);
+        return photoSection;
+    }
+    
+    private HBox createActionButtons(VBox photoSection) {
+        HBox actionButtons = new HBox(15);
+        actionButtons.setAlignment(Pos.CENTER);
+        
+        Button uploadBtn = new Button("📤 Tải ảnh lên thẻ");
+        uploadBtn.getStyleClass().addAll("btn", "btn-primary");
+        uploadBtn.setOnAction(e -> uploadPhotoToCard(photoSection));
+        
+        Button downloadBtn = new Button("📥 Tải ảnh từ thẻ");
+        downloadBtn.getStyleClass().addAll("btn", "btn-secondary");
+        downloadBtn.setOnAction(e -> downloadPhotoFromCard());
+        
+        Button refreshBtn = new Button("🔄 Làm mới");
+        refreshBtn.getStyleClass().addAll("btn", "btn-outline");
+        refreshBtn.setOnAction(e -> refreshPhotoDisplay(photoSection));
+        
+        actionButtons.getChildren().addAll(uploadBtn, downloadBtn, refreshBtn);
+        return actionButtons;
+    }
+    
+    private VBox createInfoPanel() {
+        VBox infoPanel = new VBox(10);
+        infoPanel.getStyleClass().add("info-panel");
+        infoPanel.setPadding(new Insets(15));
+        
+        Label infoTitle = new Label("📋 Thông tin quan trọng");
+        infoTitle.getStyleClass().add("info-title");
+        
+        Label infoText = new Label(
+            "• Tối đa 8KB, tự động nén\n" +
+            "• Định dạng: JPEG, PNG\n" +
+            "• Lưu trực tiếp trong thẻ"
+        );
+        infoText.getStyleClass().add("info-text");
+        infoText.setWrapText(true);
+        
+        infoPanel.getChildren().addAll(infoTitle, infoText);
+        return infoPanel;
+    }
+    
+    private void loadCurrentPhoto(ImageView photoView, Label statusLabel) {
+        new Thread(() -> {
+            try {
+                if (!cardService.isConnected()) {
+                    javafx.application.Platform.runLater(() -> {
+                        statusLabel.setText("❌ Chưa kết nối thẻ");
+                        statusLabel.getStyleClass().add("status-error");
+                    });
+                    return;
+                }
+                
+                byte[] photoData = cardService.downloadPhoto();
+                
+                javafx.application.Platform.runLater(() -> {
+                    if (photoData != null && photoData.length > 0) {
+                        Image image = PhotoUtils.bytesToImage(photoData);
+                        if (image != null) {
+                            photoView.setImage(image);
+                            statusLabel.setText("✅ " + PhotoUtils.getPhotoInfo(photoData));
+                            statusLabel.getStyleClass().removeAll("status-error");
+                            statusLabel.getStyleClass().add("status-success");
+                        } else {
+                            statusLabel.setText("❌ Lỗi đọc ảnh");
+                            statusLabel.getStyleClass().add("status-error");
+                        }
+                    } else {
+                        photoView.setImage(null);
+                        statusLabel.setText("📷 Chưa có ảnh trong thẻ");
+                        statusLabel.getStyleClass().removeAll("status-error", "status-success");
+                    }
+                });
+                
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> {
+                    statusLabel.setText("❌ Lỗi: " + e.getMessage());
+                    statusLabel.getStyleClass().add("status-error");
+                });
+            }
+        }).start();
+    }
+    
+    private void uploadPhotoToCard(VBox photoSection) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Chọn ảnh để tải lên thẻ");
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Ảnh", "*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"),
+            new FileChooser.ExtensionFilter("JPEG", "*.jpg", "*.jpeg"),
+            new FileChooser.ExtensionFilter("PNG", "*.png"),
+            new FileChooser.ExtensionFilter("Tất cả", "*.*")
+        );
+        
+        File selectedFile = fileChooser.showOpenDialog(null);
+        if (selectedFile == null) {
+            return;
+        }
+        
+        // Show progress dialog
+        Alert progressDialog = new Alert(Alert.AlertType.INFORMATION);
+        progressDialog.setTitle("Đang tải ảnh");
+        progressDialog.setHeaderText("Đang xử lý và tải ảnh lên thẻ...");
+        progressDialog.setContentText("Vui lòng đợi...");
+        progressDialog.getButtonTypes().clear();
+        progressDialog.show();
+        
+        new Thread(() -> {
+            try {
+                // Validate file
+                PhotoUtils.validatePhotoFile(selectedFile);
+                
+                // Prepare photo for card
+                javafx.application.Platform.runLater(() -> {
+                    progressDialog.setContentText("Đang nén và chuẩn bị ảnh...");
+                });
+                
+                byte[] photoData = PhotoUtils.preparePhotoForCard(selectedFile);
+                
+                // Upload to card
+                javafx.application.Platform.runLater(() -> {
+                    progressDialog.setContentText("Đang tải lên thẻ thông minh...");
+                });
+                
+                boolean success = cardService.uploadPhoto(photoData);
+                
+                javafx.application.Platform.runLater(() -> {
+                    progressDialog.close();
+                    
+                    if (success) {
+                        showSuccessAlert("Tải ảnh thành công", 
+                            "Ảnh đã được tải lên thẻ thành công!\n\n" +
+                            "Kích thước: " + PhotoUtils.getPhotoInfo(photoData));
+                        
+                        // Refresh display
+                        refreshPhotoDisplay(photoSection);
+                    } else {
+                        showErrorAlert("Tải ảnh thất bại", "Không thể tải ảnh lên thẻ.");
+                    }
+                });
+                
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> {
+                    progressDialog.close();
+                    showErrorAlert("Lỗi tải ảnh", "Không thể tải ảnh: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+    
+    private void downloadPhotoFromCard() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Lưu ảnh từ thẻ");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("JPEG", "*.jpg")
+        );
+        fileChooser.setInitialFileName("citizen_photo.jpg");
+        
+        File saveFile = fileChooser.showSaveDialog(null);
+        if (saveFile == null) {
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                byte[] photoData = cardService.downloadPhoto();
+                
+                if (photoData == null || photoData.length == 0) {
+                    javafx.application.Platform.runLater(() -> {
+                        showErrorAlert("Không có ảnh", "Thẻ chưa có ảnh để tải xuống.");
+                    });
+                    return;
+                }
+                
+                PhotoUtils.savePhotoToFile(photoData, saveFile);
+                
+                javafx.application.Platform.runLater(() -> {
+                    showSuccessAlert("Tải xuống thành công", 
+                        "Ảnh đã được lưu vào:\n" + saveFile.getPath() + "\n\n" +
+                        "Kích thước: " + PhotoUtils.getPhotoInfo(photoData));
+                });
+                
+            } catch (Exception e) {
+                javafx.application.Platform.runLater(() -> {
+                    showErrorAlert("Lỗi tải xuống", "Không thể tải ảnh: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+    
+    private void refreshPhotoDisplay(VBox photoSection) {
+        ImageView photoView = (ImageView) photoSection.getChildren().get(1);
+        Label statusLabel = (Label) photoSection.getChildren().get(2);
+        
+        statusLabel.setText("Đang tải...");
+        statusLabel.getStyleClass().removeAll("status-error", "status-success");
+        
+        loadCurrentPhoto(photoView, statusLabel);
+    }
+    
+    private void showSuccessAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText("✅ " + title);
+        alert.setContentText(message);
+        alert.getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
+        alert.showAndWait();
+    }
+    
+    private void showErrorAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText("❌ " + title);
+        alert.setContentText(message);
+        alert.getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
+        alert.showAndWait();
+    }
+}

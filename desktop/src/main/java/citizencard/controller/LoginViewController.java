@@ -1,4 +1,4 @@
-package citizencard;
+package citizencard.controller;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -7,10 +7,11 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.shape.Circle;
 import javafx.scene.paint.Color;
+
+import citizencard.service.CardService;
+import citizencard.dao.CardDAO;
+import citizencard.util.PinInputDialog;
 
 /**
  * Modern Login View Controller
@@ -23,6 +24,7 @@ public class LoginViewController {
     private BorderPane root;
     private CardService cardService;
     private CardDAO cardDAO;
+    private DemoWorkflowController demoController;
     private Label statusLabel;
     private Label connectionStatusLabel;
     private Button connectButton;
@@ -30,10 +32,12 @@ public class LoginViewController {
     private PasswordField pinField;
     private VBox loginSection;
     private ProgressIndicator loadingIndicator;
+    private boolean isAdminMode = false;
     
     public LoginViewController() {
         cardService = new CardService();
         cardDAO = CardDAO.getInstance();
+        demoController = new DemoWorkflowController(cardService, cardDAO);
         initializeUI();
     }
     
@@ -54,11 +58,14 @@ public class LoginViewController {
         VBox content = new VBox(30);
         content.setAlignment(Pos.CENTER);
         content.setPadding(new Insets(60, 80, 60, 80));
-        content.setMaxWidth(500);
+        content.setMaxWidth(600);
         content.getStyleClass().add("main-content");
         
         // Header section with icon and title
         VBox headerSection = createHeaderSection();
+        
+        // Login mode selection
+        VBox modeSelection = createModeSelection();
         
         // Card status section
         VBox statusSection = createStatusSection();
@@ -72,6 +79,7 @@ public class LoginViewController {
         
         content.getChildren().addAll(
             headerSection,
+            modeSelection,
             statusSection,
             connectionSection,
             loginSection
@@ -84,20 +92,52 @@ public class LoginViewController {
         VBox header = new VBox(15);
         header.setAlignment(Pos.CENTER);
         
-        // App icon (using Unicode symbol)
+        // App icon
         Label iconLabel = new Label("🏛️");
         iconLabel.setStyle("-fx-font-size: 64px;");
         
         // Title
-        Label titleLabel = new Label("Citizen Card System");
+        Label titleLabel = new Label("Hệ thống Thẻ Cư dân");
         titleLabel.getStyleClass().add("app-title");
         
         // Subtitle
-        Label subtitleLabel = new Label("Secure Smart Card Authentication");
+        Label subtitleLabel = new Label("Xác thực Thẻ thông minh An toàn");
         subtitleLabel.getStyleClass().add("app-subtitle");
         
         header.getChildren().addAll(iconLabel, titleLabel, subtitleLabel);
         return header;
+    }
+    
+    private VBox createModeSelection() {
+        VBox section = new VBox(20);
+        section.setAlignment(Pos.CENTER);
+        section.getStyleClass().add("mode-section");
+        
+        Label modeLabel = new Label("Chọn chế độ đăng nhập");
+        modeLabel.getStyleClass().add("mode-title");
+        
+        // Mode buttons
+        HBox modeButtons = new HBox(20);
+        modeButtons.setAlignment(Pos.CENTER);
+        
+        Button adminModeButton = new Button("👨‍💼 Quản trị viên");
+        adminModeButton.getStyleClass().addAll("btn", "btn-primary", "btn-large", "mode-button");
+        adminModeButton.setPrefWidth(200);
+        adminModeButton.setOnAction(e -> setAdminMode());
+        
+        Button citizenModeButton = new Button("👤 Cư dân");
+        citizenModeButton.getStyleClass().addAll("btn", "btn-secondary", "btn-large", "mode-button");
+        citizenModeButton.setPrefWidth(200);
+        citizenModeButton.setOnAction(e -> setCitizenMode());
+        
+        modeButtons.getChildren().addAll(adminModeButton, citizenModeButton);
+        
+        // Mode description
+        Label descLabel = new Label("Quản trị viên: Quản lý hệ thống (không cần thẻ) | Cư dân: Dịch vụ thẻ (Thẻ thông minh + mã PIN)");
+        descLabel.getStyleClass().add("mode-description");
+        
+        section.getChildren().addAll(modeLabel, modeButtons, descLabel);
+        return section;
     }
     
     private VBox createStatusSection() {
@@ -109,17 +149,13 @@ public class LoginViewController {
         HBox statusIndicator = new HBox(10);
         statusIndicator.setAlignment(Pos.CENTER);
         
-        Circle statusCircle = new Circle(6);
-        statusCircle.setFill(Color.web("#ef4444")); // Red by default
-        statusCircle.getStyleClass().add("status-circle");
-        
-        connectionStatusLabel = new Label("Disconnected");
+        connectionStatusLabel = new Label("Chưa kết nối");
         connectionStatusLabel.getStyleClass().add("status-text");
         
-        statusIndicator.getChildren().addAll(statusCircle, connectionStatusLabel);
+        statusIndicator.getChildren().add(connectionStatusLabel);
         
         // Main status message
-        statusLabel = new Label("Please connect your Smart Card to continue");
+        statusLabel = new Label("Vui lòng chọn chế độ đăng nhập để tiếp tục");
         statusLabel.getStyleClass().add("status-message");
         
         section.getChildren().addAll(statusIndicator, statusLabel);
@@ -142,14 +178,14 @@ public class LoginViewController {
         cardIcon.setStyle("-fx-font-size: 48px;");
         
         // Instructions
-        Label instructionLabel = new Label("Insert your Smart Card");
+        Label instructionLabel = new Label("Cắm thẻ thông minh của bạn");
         instructionLabel.getStyleClass().add("instruction-text");
         
-        Label detailLabel = new Label("Ensure JCIDE terminal is running");
+        Label detailLabel = new Label("Đảm bảo JCIDE terminal đang chạy");
         detailLabel.getStyleClass().add("detail-text");
         
         // Connect button
-        connectButton = new Button("Connect to Smart Card");
+        connectButton = new Button("Kết nối với Thẻ thông minh");
         connectButton.getStyleClass().addAll("btn", "btn-primary", "btn-large");
         connectButton.setOnAction(e -> connectToCard());
         
@@ -186,53 +222,34 @@ public class LoginViewController {
         lockIcon.setStyle("-fx-font-size: 42px;");
         
         // Title
-        Label loginTitle = new Label("Enter Your PIN");
+        Label loginTitle = new Label("Nhập mã PIN của bạn");
         loginTitle.getStyleClass().add("login-title");
         
         // PIN input section
         VBox pinSection = new VBox(15);
         pinSection.setAlignment(Pos.CENTER);
         
-        Label pinLabel = new Label("4-Digit PIN Code");
+        Label pinLabel = new Label("Nhấn để nhập mã PIN");
         pinLabel.getStyleClass().add("pin-label");
         
-        // PIN field with better styling
-        pinField = new PasswordField();
-        pinField.setPromptText("••••");
-        pinField.getStyleClass().add("pin-input");
-        pinField.setMaxWidth(200);
-        pinField.setAlignment(Pos.CENTER);
+        // PIN input button (opens dialog)
+        Button pinInputButton = new Button("📱 Nhập mã PIN");
+        pinInputButton.getStyleClass().addAll("btn", "btn-primary", "btn-large");
+        pinInputButton.setPrefWidth(200);
+        pinInputButton.setOnAction(e -> openPinDialog());
         
-        // Add enter key support
-        pinField.setOnAction(e -> login());
-        
-        pinSection.getChildren().addAll(pinLabel, pinField);
+        pinSection.getChildren().addAll(pinLabel, pinInputButton);
         
         // Button section
         VBox buttonSection = new VBox(15);
         buttonSection.setAlignment(Pos.CENTER);
         
-        // Login button
-        loginButton = new Button("Authenticate");
-        loginButton.getStyleClass().addAll("btn", "btn-success", "btn-large");
-        loginButton.setOnAction(e -> login());
-        loginButton.setPrefWidth(200);
+        // Status label for PIN
+        Label pinStatusLabel = new Label();
+        pinStatusLabel.getStyleClass().add("pin-status-label");
+        pinStatusLabel.setVisible(false);
         
-        // Secondary actions
-        HBox secondaryActions = new HBox(15);
-        secondaryActions.setAlignment(Pos.CENTER);
-        
-        Button adminButton = new Button("Admin Access");
-        adminButton.getStyleClass().addAll("btn", "btn-outline");
-        adminButton.setOnAction(e -> adminLogin());
-        
-        Button helpButton = new Button("Help");
-        helpButton.getStyleClass().addAll("btn", "btn-text");
-        helpButton.setOnAction(e -> showHelp());
-        
-        secondaryActions.getChildren().addAll(adminButton, helpButton);
-        
-        buttonSection.getChildren().addAll(loginButton, secondaryActions);
+        buttonSection.getChildren().add(pinStatusLabel);
         
         loginCard.getChildren().addAll(
             lockIcon,
@@ -251,20 +268,62 @@ public class LoginViewController {
         footer.setPadding(new Insets(20));
         footer.getStyleClass().add("footer");
         
-        Label footerText = new Label("Citizen Card Management System v1.0 | Secure Smart Card Technology");
+        Label footerText = new Label("Hệ thống Quản lý Thẻ Cư dân v1.0 | Công nghệ Thẻ thông minh An toàn");
         footerText.getStyleClass().add("footer-text");
         
         footer.getChildren().add(footerText);
         return footer;
     }
     
+    // =====================================================
+    // MODE SELECTION HANDLERS
+    // =====================================================
+    
+    private void setAdminMode() {
+        isAdminMode = true;
+        statusLabel.setText("Chế độ Quản trị viên: Đang tải bảng điều khiển admin...");
+        
+        // Admin doesn't need login - direct access to dashboard
+        showAdminDashboard();
+    }
+    
+    private void setCitizenMode() {
+        isAdminMode = false;
+        statusLabel.setText("Chế độ Cư dân: Vui lòng cắm Thẻ thông minh và kết nối để tiếp tục");
+        
+        // Citizen needs card connection - show connection section
+        // Connection section is already visible, just update status
+    }
+    
+    private void showAdminDashboard() {
+        // Create new admin dashboard window
+        AdminDashboardController adminController = new AdminDashboardController();
+        
+        // Replace current scene with admin dashboard
+        javafx.stage.Stage stage = (javafx.stage.Stage) root.getScene().getWindow();
+        javafx.scene.Scene adminScene = new javafx.scene.Scene(adminController.getRoot(), 1200, 800);
+        
+        // Load CSS
+        adminScene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
+        
+        stage.setScene(adminScene);
+        stage.setTitle("Hệ thống Quản lý Thẻ Cư dân - Bảng điều khiển Quản trị viên");
+        stage.centerOnScreen();
+        
+        System.out.println("🎛️ Bảng điều khiển Quản trị viên đã tải");
+    }
+    
+    // =====================================================
+    // CARD CONNECTION HANDLERS
+    // =====================================================
+    
     private void connectToCard() {
         // Show loading state
         connectButton.setDisable(true);
-        connectButton.setText("Connecting...");
+        connectButton.setText("Đang kết nối...");
         loadingIndicator.setVisible(true);
-        statusLabel.setText("Connecting to Smart Card...");
-        connectionStatusLabel.setText("Connecting...");
+        statusLabel.setText("Đang kết nối với Thẻ thông minh...");
+        connectionStatusLabel.setText("Đang kết nối...");
         
         // Run in background thread
         new Thread(() -> {
@@ -278,7 +337,7 @@ public class LoginViewController {
                     if (connected) {
                         // Update UI for successful connection
                         updateConnectionStatus(true);
-                        connectButton.setText("✓ Connected");
+                        connectButton.setText("✓ Đã kết nối");
                         connectButton.getStyleClass().removeAll("btn-primary");
                         connectButton.getStyleClass().add("btn-success");
                         
@@ -288,27 +347,29 @@ public class LoginViewController {
                             
                             // Check if card is registered
                             if (cardDAO.isCardRegistered(cardId)) {
-                                statusLabel.setText("Card authenticated successfully. Please enter your PIN.");
+                                statusLabel.setText("Thẻ đã được xác thực thành công. Vui lòng nhập mã PIN.");
                                 showLoginSection();
                             } else {
-                                statusLabel.setText("⚠️ Card not registered in system. Please contact administrator.");
-                                showAlert("Card Not Registered", 
-                                    "This card is not registered in the system.\n\n" +
-                                    "Please contact your system administrator to register this card.\n\n" +
-                                    "Card ID: " + cardId);
+                                statusLabel.setText("⚠️ Thẻ chưa được đăng ký trong hệ thống. Vui lòng liên hệ quản trị viên.");
+                                showAlert("Thẻ chưa được đăng ký", 
+                                    "Thẻ này chưa được đăng ký trong hệ thống.\n\n" +
+                                    "Vui lòng liên hệ quản trị viên hệ thống để đăng ký thẻ này.\n\n" +
+                                    "ID Thẻ: " + cardId);
                             }
                         } catch (Exception e) {
-                            statusLabel.setText("⚠️ Card connected but not properly initialized.");
-                            showAlert("Card Error", 
-                                "Card is connected but there was an error reading card information:\n\n" + 
-                                e.getMessage());
+                            // Card is connected but not initialized
+                            statusLabel.setText("Thẻ đã kết nối nhưng chưa được khởi tạo. Vui lòng liên hệ quản trị viên.");
+                            showAlert("Thẻ chưa được khởi tạo", 
+                                "Thẻ này chưa được khởi tạo.\n\n" +
+                                "Vui lòng liên hệ quản trị viên hệ thống để thiết lập thẻ này.\n\n" +
+                                "Lỗi: " + e.getMessage());
                         }
                         
                     } else {
                         // Connection failed
                         updateConnectionStatus(false);
-                        statusLabel.setText("Failed to connect to Smart Card. Please check your card and try again.");
-                        connectButton.setText("Retry Connection");
+                        statusLabel.setText("Không thể kết nối với Thẻ thông minh. Vui lòng kiểm tra thẻ và thử lại.");
+                        connectButton.setText("Thử kết nối lại");
                         connectButton.setDisable(false);
                     }
                 });
@@ -317,8 +378,8 @@ public class LoginViewController {
                 javafx.application.Platform.runLater(() -> {
                     loadingIndicator.setVisible(false);
                     updateConnectionStatus(false);
-                    statusLabel.setText("Connection error: " + e.getMessage());
-                    connectButton.setText("Retry Connection");
+                    statusLabel.setText("Lỗi kết nối: " + e.getMessage());
+                    connectButton.setText("Thử kết nối lại");
                     connectButton.setDisable(false);
                 });
             }
@@ -327,11 +388,11 @@ public class LoginViewController {
     
     private void updateConnectionStatus(boolean connected) {
         if (connected) {
-            connectionStatusLabel.setText("Connected");
+            connectionStatusLabel.setText("Đã kết nối");
             connectionStatusLabel.getStyleClass().removeAll("status-text");
             connectionStatusLabel.getStyleClass().add("status-text-success");
         } else {
-            connectionStatusLabel.setText("Disconnected");
+            connectionStatusLabel.setText("Chưa kết nối");
             connectionStatusLabel.getStyleClass().removeAll("status-text-success");
             connectionStatusLabel.getStyleClass().add("status-text");
         }
@@ -339,42 +400,50 @@ public class LoginViewController {
     
     private void showLoginSection() {
         loginSection.setVisible(true);
-        pinField.requestFocus();
     }
     
-    private void login() {
-        String pin = pinField.getText().trim();
+    /**
+     * Open PIN input dialog
+     */
+    private void openPinDialog() {
+        String pin = PinInputDialog.showPinDialog(
+            "Xác thực thẻ cư dân", 
+            "🔐 Nhập mã PIN để truy cập thẻ của bạn"
+        );
         
-        // Validate PIN format
-        if (pin.length() != 4) {
-            showAlert("Invalid PIN Format", "PIN must be exactly 4 digits.\n\nPlease enter a valid 4-digit PIN code.");
-            pinField.clear();
-            pinField.requestFocus();
-            return;
+        if (pin != null && !pin.isEmpty()) {
+            loginWithPin(pin);
         }
-        
-        if (!pin.matches("\\d{4}")) {
-            showAlert("Invalid PIN Format", "PIN must contain only numbers.\n\nPlease enter a valid 4-digit PIN code.");
-            pinField.clear();
-            pinField.requestFocus();
+    }
+    
+    // =====================================================
+    // LOGIN HANDLERS
+    // =====================================================
+    
+    /**
+     * Login with PIN from dialog
+     */
+    private void loginWithPin(String pin) {
+        // Validate PIN format (already validated in dialog, but double-check)
+        if (pin.length() != 4 || !pin.matches("\\d{4}")) {
+            showAlert("Định dạng PIN không hợp lệ", "PIN phải có đúng 4 chữ số.\n\nVui lòng thử lại.");
             return;
         }
         
         // Show loading state
-        loginButton.setDisable(true);
-        loginButton.setText("Authenticating...");
-        statusLabel.setText("Verifying your PIN code...");
-        pinField.setDisable(true);
+        statusLabel.setText("Đang xác minh mã PIN của bạn...");
+        statusLabel.getStyleClass().removeAll("status-error", "status-success");
+        statusLabel.getStyleClass().add("status-loading");
         
         // Run in background thread
         new Thread(() -> {
             try {
                 Thread.sleep(800); // Small delay for better UX
-                boolean verified = cardService.verifyPin(pin);
+                CardService.PinVerificationResult pinResult = cardService.verifyPin(pin);
                 
                 javafx.application.Platform.runLater(() -> {
-                    if (verified) {
-                        statusLabel.setText("✅ Authentication successful! Loading your account...");
+                    if (pinResult.success) {
+                        statusLabel.setText("✅ Xác thực thành công! Đang tải tài khoản của bạn...");
                         
                         // Get card info and show dashboard
                         try {
@@ -386,7 +455,7 @@ public class LoginViewController {
                             cardDAO.logTransaction(cardId, "LOGIN", true, null);
                             
                             // Show success and then dashboard
-                            showSuccessMessage("Welcome!", "Authentication successful.\n\nLoading your dashboard...");
+                            showSuccessMessage("Chào mừng!", "Xác thực thành công.\n\nĐang tải bảng điều khiển của bạn...");
                             
                             // Delay before showing dashboard
                             new Thread(() -> {
@@ -401,27 +470,34 @@ public class LoginViewController {
                             }).start();
                             
                         } catch (Exception e) {
-                            showAlert("System Error", "Authentication successful but failed to load account information:\n\n" + e.getMessage());
+                            showAlert("Lỗi hệ thống", "Xác thực thành công nhưng không thể tải thông tin tài khoản:\n\n" + e.getMessage());
                             resetLoginForm();
                         }
                         
                     } else {
-                        statusLabel.setText("❌ Invalid PIN code. Please check and try again.");
-                        showAlert("Authentication Failed", 
-                            "The PIN code you entered is incorrect.\n\n" +
-                            "Please check your PIN and try again.\n\n" +
-                            "⚠️ Too many failed attempts may lock your card.");
+                        statusLabel.setText("❌ Mã PIN không đúng. Vui lòng kiểm tra và thử lại.");
+                        String errorMsg = "Mã PIN bạn nhập không chính xác.\n\n";
+                        
+                        if (pinResult.remainingTries > 0) {
+                            errorMsg += "Số lần thử còn lại: " + pinResult.remainingTries + "\n\n";
+                            errorMsg += "⚠️ Quá nhiều lần thử sai sẽ khóa thẻ của bạn.";
+                        } else {
+                            errorMsg += "🔒 Thẻ đã bị khóa do nhập sai PIN quá nhiều lần.\n\n";
+                            errorMsg += "Vui lòng liên hệ quản trị viên để mở khóa.";
+                        }
+                        
+                        showAlert("Xác thực thất bại", errorMsg);
                         resetLoginForm();
                     }
                 });
                 
             } catch (Exception e) {
                 javafx.application.Platform.runLater(() -> {
-                    statusLabel.setText("❌ Authentication error occurred.");
-                    showAlert("Connection Error", 
-                        "There was an error communicating with your Smart Card:\n\n" + 
+                    statusLabel.setText("❌ Đã xảy ra lỗi xác thực.");
+                    showAlert("Lỗi kết nối", 
+                        "Có lỗi khi giao tiếp với Thẻ thông minh của bạn:\n\n" + 
                         e.getMessage() + "\n\n" +
-                        "Please ensure your card is properly inserted and try again.");
+                        "Vui lòng đảm bảo thẻ được cắm đúng cách và thử lại.");
                     resetLoginForm();
                 });
             }
@@ -429,129 +505,26 @@ public class LoginViewController {
     }
     
     private void resetLoginForm() {
-        pinField.clear();
-        pinField.setDisable(false);
-        pinField.requestFocus();
-        loginButton.setText("Authenticate");
-        loginButton.setDisable(false);
-    }
-    
-    private void adminLogin() {
-        // Create admin login dialog
-        Dialog<String> dialog = new Dialog<>();
-        dialog.setTitle("Administrator Access");
-        dialog.setHeaderText("System Administrator Login");
-        
-        // Set dialog content
-        VBox content = new VBox(15);
-        content.setPadding(new Insets(20));
-        
-        Label infoLabel = new Label("Enter administrator credentials:");
-        PasswordField adminPassword = new PasswordField();
-        adminPassword.setPromptText("Admin password");
-        
-        content.getChildren().addAll(infoLabel, adminPassword);
-        dialog.getDialogPane().setContent(content);
-        
-        // Add buttons
-        ButtonType loginButtonType = new ButtonType("Login", ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(loginButtonType, ButtonType.CANCEL);
-        
-        // Show dialog
-        dialog.showAndWait().ifPresent(result -> {
-            showAlert("Admin Access", "Administrator functionality is not yet implemented.\n\nThis feature will be available in a future update.");
-        });
-    }
-    
-    private void showHelp() {
-        Alert helpDialog = new Alert(Alert.AlertType.INFORMATION);
-        helpDialog.setTitle("Help & Support");
-        helpDialog.setHeaderText("How to use Citizen Card System");
-        
-        String helpContent = 
-            "🔧 SETUP REQUIREMENTS:\n" +
-            "• Smart Card reader connected to computer\n" +
-            "• JCIDE terminal software running\n" +
-            "• Valid Citizen Card inserted in reader\n\n" +
-            
-            "📋 STEP-BY-STEP GUIDE:\n" +
-            "1. Insert your Citizen Card into the card reader\n" +
-            "2. Ensure JCIDE terminal is running and connected\n" +
-            "3. Click 'Connect to Smart Card' button\n" +
-            "4. Wait for successful connection confirmation\n" +
-            "5. Enter your 4-digit PIN code\n" +
-            "6. Click 'Authenticate' to access your account\n\n" +
-            
-            "⚠️ TROUBLESHOOTING:\n" +
-            "• Check card reader connection\n" +
-            "• Verify JCIDE terminal is running\n" +
-            "• Ensure card is properly inserted\n" +
-            "• Contact administrator if card is not registered\n\n" +
-            
-            "🔒 SECURITY NOTES:\n" +
-            "• Never share your PIN with others\n" +
-            "• Multiple failed PIN attempts may lock your card\n" +
-            "• Always remove card when finished";
-        
-        helpDialog.setContentText(helpContent);
-        helpDialog.showAndWait();
+        statusLabel.setText("Sẵn sàng để xác thực");
+        statusLabel.getStyleClass().removeAll("status-error", "status-success", "status-loading");
     }
     
     private void showDashboard(String cardId, int balance) {
-        // Create beautiful dashboard dialog
-        Alert dashboard = new Alert(Alert.AlertType.INFORMATION);
-        dashboard.setTitle("Citizen Card Dashboard");
-        dashboard.setHeaderText("🎉 Welcome to your account!");
+        // Create new citizen dashboard window
+        CitizenDashboardController citizenController = new CitizenDashboardController(cardService, cardId, balance);
         
-        String content = String.format(
-            "💳 CARD INFORMATION:\n" +
-            "Card ID: %s\n" +
-            "Status: Active\n" +
-            "Balance: %,d VND\n\n" +
-            
-            "🚀 AVAILABLE SERVICES:\n" +
-            "• 💰 View Current Balance\n" +
-            "• 💵 Top Up Balance\n" +
-            "• 🛒 Make Payments\n" +
-            "• 🔐 Change PIN Code\n" +
-            "• 📊 View Transaction History\n" +
-            "• ⚙️ Account Settings\n\n" +
-            
-            "📱 QUICK ACTIONS:\n" +
-            "• Balance inquiries are free\n" +
-            "• Secure PIN-protected transactions\n" +
-            "• Real-time transaction processing\n\n" +
-            
-            "💡 TIP: Keep your card safe and never share your PIN!",
-            cardId, balance
-        );
+        // Replace current scene with citizen dashboard
+        javafx.stage.Stage stage = (javafx.stage.Stage) root.getScene().getWindow();
+        javafx.scene.Scene citizenScene = new javafx.scene.Scene(citizenController.getRoot(), 1200, 800);
         
-        dashboard.setContentText(content);
+        // Load CSS
+        citizenScene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
         
-        // Customize dialog buttons
-        ButtonType continueButton = new ButtonType("Continue Using Card", ButtonBar.ButtonData.OK_DONE);
-        ButtonType logoutButton = new ButtonType("Logout & Disconnect", ButtonBar.ButtonData.CANCEL_CLOSE);
-        dashboard.getDialogPane().getButtonTypes().setAll(continueButton, logoutButton);
+        stage.setScene(citizenScene);
+        stage.setTitle("Hệ thống Quản lý Thẻ Cư dân - Tài khoản của tôi");
+        stage.centerOnScreen();
         
-        dashboard.showAndWait().ifPresent(response -> {
-            if (response == logoutButton) {
-                logout();
-            } else {
-                // For now, just logout since full dashboard isn't implemented
-                showAlert("Coming Soon", 
-                    "Full dashboard functionality is being developed.\n\n" +
-                    "Current features available:\n" +
-                    "• Card connection and authentication ✓\n" +
-                    "• PIN verification ✓\n" +
-                    "• Balance inquiry ✓\n\n" +
-                    "Coming soon:\n" +
-                    "• Transaction management\n" +
-                    "• Balance top-up\n" +
-                    "• Payment processing\n" +
-                    "• PIN change functionality");
-                logout();
-            }
-        });
+        System.out.println("🏠 Bảng điều khiển Cư dân đã tải cho thẻ: " + cardId);
     }
     
     private void logout() {
@@ -560,8 +533,8 @@ public class LoginViewController {
         
         // Reset UI state
         updateConnectionStatus(false);
-        statusLabel.setText("Session ended. Please connect your Smart Card to continue.");
-        connectButton.setText("Connect to Smart Card");
+        statusLabel.setText("Phiên làm việc đã kết thúc. Vui lòng kết nối Thẻ thông minh để tiếp tục.");
+        connectButton.setText("Kết nối với Thẻ thông minh");
         connectButton.getStyleClass().removeAll("btn-success");
         connectButton.getStyleClass().add("btn-primary");
         connectButton.setDisable(false);
@@ -570,8 +543,12 @@ public class LoginViewController {
         loginSection.setVisible(false);
         pinField.clear();
         
-        showSuccessMessage("Logged Out", "You have been safely logged out.\n\nThank you for using Citizen Card System!");
+        showSuccessMessage("Đã đăng xuất", "Bạn đã đăng xuất an toàn.\n\nCảm ơn bạn đã sử dụng Hệ thống Thẻ Cư dân!");
     }
+    
+    // =====================================================
+    // UTILITY METHODS
+    // =====================================================
     
     private void showAlert(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.WARNING);
