@@ -1,7 +1,7 @@
 package citizencard.util;
 
 import javafx.scene.image.Image;
-// import javafx.embed.swing.SwingFXUtils; // Not available in all JavaFX versions
+import javafx.embed.swing.SwingFXUtils;
 import java.awt.image.BufferedImage;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -16,14 +16,12 @@ import javax.imageio.ImageIO;
  */
 public class PhotoUtils {
 
-    private static final int MAX_PHOTO_SIZE = 5120; // 5KB - chunked transfer
-    private static final int TARGET_WIDTH = 120; // Good quality avatar
-    private static final int TARGET_HEIGHT = 150;
-    private static final float JPEG_QUALITY = 0.7f; // Good quality
+    private static final int MAX_PHOTO_SIZE = 15360; // 15KB - matched with Applet limit
+    private static final float JPEG_QUALITY = 0.9f; // Increased quality
 
     /**
      * Prepare photo for smart card upload
-     * Resizes and compresses to fit 1024 byte limit (simple APDU)
+     * Resizes and compresses to fit limit, prioritizing original dimensions
      */
     public static byte[] preparePhotoForCard(File imageFile) throws Exception {
         if (!imageFile.exists()) {
@@ -31,43 +29,88 @@ public class PhotoUtils {
         }
 
         // Read original image
+        // Try ImageIO first (supports JPG, PNG, BMP)
         BufferedImage original = ImageIO.read(imageFile);
+
+        // If ImageIO returns null (e.g. for WebP), try loading as JavaFX Image
         if (original == null) {
-            throw new IOException("Cannot read image file: " + imageFile.getPath());
+            System.out.println("[PHOTO] ImageIO failed to read, trying JavaFX Image (likely WebP)...");
+            Image fxImage = new Image(imageFile.toURI().toString());
+            if (fxImage.isError()) {
+                throw new IOException("Cannot read image file: " + imageFile.getPath());
+            }
+            // Convert FX Image to BufferedImage
+            original = SwingFXUtils.fromFXImage(fxImage, null);
         }
+
+        if (original == null) {
+            throw new IOException("Failed to load image: " + imageFile.getPath());
+        }
+
+        // Remove alpha channel (transparency) by converting to RGB
+        // This is important because JPEG doesn't support transparency
+        BufferedImage rgbImage = new BufferedImage(
+                original.getWidth(),
+                original.getHeight(),
+                BufferedImage.TYPE_INT_RGB);
+
+        Graphics2D g2d = rgbImage.createGraphics();
+        g2d.setColor(java.awt.Color.WHITE); // Fill background white
+        g2d.fillRect(0, 0, original.getWidth(), original.getHeight());
+        g2d.drawImage(original, 0, 0, null);
+        g2d.dispose();
+
+        original = rgbImage;
 
         System.out.println("[PHOTO] Original size: " + original.getWidth() + "x" + original.getHeight());
 
-        // Resize to target dimensions
-        BufferedImage resized = resizeImage(original, TARGET_WIDTH, TARGET_HEIGHT);
-        System.out.println("[PHOTO] Resized to: " + resized.getWidth() + "x" + resized.getHeight());
-
-        // Compress to JPEG with quality adjustment
-        byte[] photoBytes = compressToJPEG(resized, JPEG_QUALITY);
-        System.out.println("[PHOTO] Initial compression: " + photoBytes.length + " bytes");
-
-        // If still too large, reduce quality further
-        float quality = JPEG_QUALITY;
-        while (photoBytes.length > MAX_PHOTO_SIZE && quality > 0.05f) {
-            quality -= 0.05f;
-            photoBytes = compressToJPEG(resized, quality);
-            System.out.println("[PHOTO] Recompressed with quality " + quality + ": " + photoBytes.length + " bytes");
+        // Step 1: Try with original dimensions first (but limit max dimension to avoid
+        // ultra-large files)
+        // If > 800px, resize to 800px first for sanity
+        BufferedImage workingImage = original;
+        int maxDim = Math.max(original.getWidth(), original.getHeight());
+        if (maxDim > 800) {
+            workingImage = resizeImage(original, 800, 800 * original.getHeight() / original.getWidth());
+            System.out.println("[PHOTO] Large image detected, pre-resized to: " + workingImage.getWidth() + "x"
+                    + workingImage.getHeight());
         }
 
-        // If still too large, resize smaller
-        int width = TARGET_WIDTH;
-        int height = TARGET_HEIGHT;
-        while (photoBytes.length > MAX_PHOTO_SIZE && width > 16) {
-            width = (int) (width * 0.8);
-            height = (int) (height * 0.8);
-            resized = resizeImage(original, width, height);
-            photoBytes = compressToJPEG(resized, 0.1f);
-            System.out.println("[PHOTO] Resized to " + width + "x" + height + ": " + photoBytes.length + " bytes");
+        // Compress to JPEG with high quality
+        byte[] photoBytes = compressToJPEG(workingImage, JPEG_QUALITY);
+        System.out.println("[PHOTO] Initial compression: " + photoBytes.length + " bytes");
+
+        // Step 2: If too large, reduce quality (down to 0.5)
+        float quality = JPEG_QUALITY;
+        while (photoBytes.length > MAX_PHOTO_SIZE && quality > 0.5f) {
+            quality -= 0.1f;
+            photoBytes = compressToJPEG(workingImage, quality);
+            System.out.println("[PHOTO] Reducing quality to " + String.format("%.1f", quality) + ": "
+                    + photoBytes.length + " bytes");
+        }
+
+        // Step 3: If still too large, resize incrementally (maintain aspect ratio)
+        // Reduce scaling factor until fit
+        double scale = 0.9;
+        while (photoBytes.length > MAX_PHOTO_SIZE && scale > 0.1) {
+            int newWidth = (int) (workingImage.getWidth() * scale);
+            int newHeight = (int) (workingImage.getHeight() * scale);
+
+            BufferedImage resized = resizeImage(workingImage, newWidth, newHeight);
+
+            // Try with good quality first, then lower if needed for this size
+            photoBytes = compressToJPEG(resized, 0.7f);
+
+            if (photoBytes.length > MAX_PHOTO_SIZE) {
+                photoBytes = compressToJPEG(resized, 0.5f);
+            }
+
+            System.out.println("[PHOTO] Resizing to " + newWidth + "x" + newHeight + " (scale "
+                    + String.format("%.1f", scale) + "): " + photoBytes.length + " bytes");
+            scale -= 0.1;
         }
 
         if (photoBytes.length > MAX_PHOTO_SIZE) {
-            throw new IOException("Cannot compress image to fit " + MAX_PHOTO_SIZE + " byte limit. Final size: "
-                    + photoBytes.length + " bytes. Consider using a simpler image.");
+            throw new IOException("Cannot compress image to fit " + MAX_PHOTO_SIZE + " byte limit.");
         }
 
         System.out.println("[PHOTO] Final photo ready: " + photoBytes.length + " bytes");
@@ -82,18 +125,26 @@ public class PhotoUtils {
             throw new IllegalArgumentException("Image is null");
         }
 
-        // Convert JavaFX Image to BufferedImage
-        // Note: SwingFXUtils may not be available in all JavaFX versions
-        // For now, we'll use a workaround
-        BufferedImage bufferedImage = new BufferedImage(
-                (int) fxImage.getWidth(),
-                (int) fxImage.getHeight(),
+        // Convert JavaFX Image to BufferedImage using SwingFXUtils
+        BufferedImage bufferedImage = SwingFXUtils.fromFXImage(fxImage, null);
+
+        // Convert to RGB (handle transparency)
+        BufferedImage rgbImage = new BufferedImage(
+                bufferedImage.getWidth(),
+                bufferedImage.getHeight(),
                 BufferedImage.TYPE_INT_RGB);
 
-        // Create temporary file and use existing method
+        Graphics2D g2d = rgbImage.createGraphics();
+        g2d.setColor(java.awt.Color.WHITE);
+        g2d.fillRect(0, 0, rgbImage.getWidth(), rgbImage.getHeight());
+        g2d.drawImage(bufferedImage, 0, 0, null);
+        g2d.dispose();
+
+        // Use temporary file to reuse the logic (or refactor to direct byte array - but
+        // file is easier for now)
         File tempFile = File.createTempFile("temp_photo", ".png");
         try {
-            ImageIO.write(bufferedImage, "png", tempFile);
+            ImageIO.write(rgbImage, "png", tempFile);
             return preparePhotoForCard(tempFile);
         } finally {
             tempFile.delete();
@@ -114,6 +165,11 @@ public class PhotoUtils {
 
         BufferedImage resized = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = resized.createGraphics();
+
+        // CRITICAL: Fill white background FIRST to prevent black backgrounds
+        // This fixes PNG images with transparency appearing black
+        g2d.setColor(java.awt.Color.WHITE);
+        g2d.fillRect(0, 0, newWidth, newHeight);
 
         // High quality rendering
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -261,10 +317,21 @@ public class PhotoUtils {
             throw new IllegalArgumentException("File too large (max 50MB): " + file.getPath());
         }
 
-        // Try to read as image
+        // Try to read as image - first with ImageIO (JPG, PNG, BMP, GIF)
         BufferedImage img = ImageIO.read(file);
+        
+        // If ImageIO fails (e.g. WebP), try JavaFX Image
         if (img == null) {
-            throw new IllegalArgumentException("Not a valid image file: " + file.getPath());
+            try {
+                Image fxImage = new Image(file.toURI().toString());
+                if (fxImage.isError()) {
+                    throw new IllegalArgumentException("Not a valid image file: " + file.getPath());
+                }
+                // WebP or other format supported by JavaFX - valid!
+                System.out.println("[PHOTO] Validated via JavaFX Image (likely WebP): " + file.getName());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Not a valid image file: " + file.getPath());
+            }
         }
     }
 }

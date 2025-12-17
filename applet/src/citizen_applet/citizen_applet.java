@@ -29,6 +29,7 @@ public class citizen_applet extends Applet implements ExtendedLength {
     private static final byte INS_CREATE = (byte) 0x01;
     private static final byte INS_GET = (byte) 0x02;
     private static final byte INS_UPDATE = (byte) 0x03;
+    private static final byte INS_GET_AVATAR_CHUNK = (byte) 0x04;
     private static final byte INS_RESET_TRY_PIN = (byte) 0x10;
     private static final byte INS_CLEAR_CARD = (byte) 0x11;
 
@@ -174,6 +175,9 @@ public class citizen_applet extends Applet implements ExtendedLength {
             case INS_UPDATE:
                 processUpdate(apdu, p1, p2);
                 break;
+            case INS_GET_AVATAR_CHUNK:
+                getAvatarChunk(apdu);
+                break;
             case INS_RESET_TRY_PIN:
                 resetPinTries(apdu);
                 break;
@@ -254,7 +258,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
                 createSignature(apdu);
                 break;
             case P1_CITIZEN_INFO:
-                if (p2 == P2_AVATAR) {
+                // Check P2 with mask 0x7F (ignore bit 7 used for chunk flag)
+                if ((p2 & 0x7F) == P2_AVATAR) {
                     createAvatar(apdu);
                 } else {
                     ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
@@ -493,7 +498,16 @@ public class citizen_applet extends Applet implements ExtendedLength {
     }
 
     /**
-     * Get avatar with Extended APDU response
+     * Get avatar with Multi-Command Chunked Download support
+     * 
+     * Mode 1 (Legacy): P1 = 0x00 - Uses sendBytesLong (single command)
+     * Mode 2 (Chunked): P1 = 0x01 - Uses P1/P2 as offset for multi-command download
+     * - P1 high byte = offset >> 8
+     * - P2 low byte = offset & 0xFF
+     * - Returns: [totalLen:2][chunkLen:2][chunkData:N]
+     */
+    /**
+     * Get avatar (Legacy Single Command)
      */
     private void getAvatar(APDU apdu) {
         if (!cardInitialized || !pinVerified) {
@@ -524,6 +538,61 @@ public class citizen_applet extends Applet implements ExtendedLength {
             pointer += chunkLen;
             remaining -= chunkLen;
         }
+    }
+
+    /**
+     * Get avatar chunk (New Multi-Command Protocol)
+     * P1/P2 encode offset: (P1 << 8) | P2
+     */
+    private void getAvatarChunk(APDU apdu) {
+        if (!cardInitialized || !pinVerified) {
+            ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+        }
+
+        if (avatarSize == 0) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+
+        byte[] buf = apdu.getBuffer();
+        byte p1 = buf[ISO7816.OFFSET_P1];
+        byte p2 = buf[ISO7816.OFFSET_P2];
+
+        // Decrypt avatar (optimized: only if needed, but for security we decrypt to
+        // buffer first)
+        aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
+        aesCipher.doFinal(avatar, (short) 0, avatarSize, avatarBuffer, (short) 0);
+
+        // Get actual length
+        short actualLen = getArrayLen(avatarBuffer, avatarSize);
+
+        // Calculate offset directly from P1/P2
+        short offset = (short) (((p1 & 0xFF) << 8) | (p2 & 0xFF));
+
+        // Validate offset
+        if (offset >= actualLen) {
+            // Return empty response to indicate end
+            buf[0] = (byte) ((actualLen >> 8) & 0xFF);
+            buf[1] = (byte) (actualLen & 0xFF);
+            buf[2] = 0;
+            buf[3] = 0;
+            apdu.setOutgoingAndSend((short) 0, (short) 4);
+            return;
+        }
+
+        // Calculate chunk size (max 200 bytes per chunk)
+        short remaining = (short) (actualLen - offset);
+        short chunkLen = (remaining > 200) ? 200 : remaining;
+
+        // Build response: [totalLen:2][chunkLen:2][data:N]
+        buf[0] = (byte) ((actualLen >> 8) & 0xFF);
+        buf[1] = (byte) (actualLen & 0xFF);
+        buf[2] = (byte) ((chunkLen >> 8) & 0xFF);
+        buf[3] = (byte) (chunkLen & 0xFF);
+
+        // Copy chunk data
+        Util.arrayCopy(avatarBuffer, offset, buf, (short) 4, chunkLen);
+
+        apdu.setOutgoingAndSend((short) 0, (short) (4 + chunkLen));
     }
 
     // =====================================================

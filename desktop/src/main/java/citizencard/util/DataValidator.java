@@ -401,7 +401,7 @@ public class DataValidator {
         
         // Check file extension
         String fileName = imageFile.getName().toLowerCase();
-        String[] allowedExtensions = {".jpg", ".jpeg", ".png", ".bmp", ".gif"};
+        String[] allowedExtensions = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"};
         
         boolean validExtension = false;
         for (String ext : allowedExtensions) {
@@ -412,7 +412,7 @@ public class DataValidator {
         }
         
         if (!validExtension) {
-            return ValidationResult.error("Định dạng ảnh không được hỗ trợ. Chỉ chấp nhận: JPG, PNG, BMP, GIF");
+            return ValidationResult.error("Định dạng ảnh không được hỗ trợ. Chỉ chấp nhận: JPG, PNG, BMP, GIF, WebP");
         }
         
         return ValidationResult.success();

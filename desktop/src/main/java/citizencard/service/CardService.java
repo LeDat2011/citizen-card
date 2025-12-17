@@ -892,32 +892,8 @@ public class CardService {
     }
 
     /**
-     * Build Extended APDU with 3-byte LC
-     */
-    private byte[] buildExtendedAPDU(byte ins, byte p1, byte p2, byte[] data) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        baos.write(0x00); // CLA
-        baos.write(ins); // INS
-        baos.write(p1); // P1
-        baos.write(p2); // P2
-
-        int dataLen = (data == null) ? 0 : data.length;
-
-        // Extended APDU: 3-byte LC (0x00 + 2-byte length)
-        baos.write(0x00); // Extended length indicator
-        baos.write((dataLen >> 8) & 0xFF); // LC high byte
-        baos.write(dataLen & 0xFF); // LC low byte
-
-        if (data != null) {
-            baos.write(data);
-        }
-
-        return baos.toByteArray();
-    }
-
-    /**
-     * Download avatar from card (v2.0 - Simple APDU)
+     * Download avatar from card using chunked transfer (like KMPSmartCard)
+     * P1|P2 = offset, returns up to 240 bytes per call
      * 
      * @return Avatar bytes or null if no avatar
      */
@@ -927,41 +903,76 @@ public class CardService {
         }
 
         try {
-            System.out.println("[PHOTO] Downloading avatar...");
-
-            // Use INS_GET with P1_CITIZEN_INFO and P2_AVATAR
-            byte[] response = sendCommand(INS_GET, P1_CITIZEN_INFO, P2_AVATAR, null);
-
-            if (isSuccess(response)) {
-                byte[] photoData = getResponseData(response);
-                if (photoData.length > 0) {
-                    System.out.println("[PHOTO] Download successful! Size: " + photoData.length + " bytes");
-
-                    // Debug: show first bytes to verify JPEG header
-                    StringBuilder firstBytes = new StringBuilder("[PHOTO] First 16 bytes: ");
-                    for (int i = 0; i < Math.min(16, photoData.length); i++) {
-                        firstBytes.append(String.format("%02X ", photoData[i] & 0xFF));
-                    }
-                    System.out.println(firstBytes.toString());
-
-                    // JPEG should start with FF D8 FF
-                    if (photoData.length >= 2 &&
-                            (photoData[0] & 0xFF) == 0xFF &&
-                            (photoData[1] & 0xFF) == 0xD8) {
-                        System.out.println("[PHOTO] Valid JPEG header detected!");
-                    } else {
-                        System.err.println("[PHOTO] WARNING: Data does not have JPEG header!");
-                    }
-
-                    return photoData;
-                } else {
-                    System.out.println("[PHOTO] No avatar stored on card");
-                    return null;
+            System.out.println("[PHOTO] Downloading avatar (Chunked Transfer)...");
+            ByteArrayOutputStream fullAvatar = new ByteArrayOutputStream();
+            
+            int offset = 0;
+            final int MAX_TOTAL = 8192;   // Max avatar size in applet
+            final int MAX_CHUNKS = 50;    // Safety limit
+            
+            for (int i = 0; i < MAX_CHUNKS && offset < MAX_TOTAL; i++) {
+                // Calculate P1, P2 from offset
+                byte p1 = (byte) ((offset >> 8) & 0xFF);
+                byte p2 = (byte) (offset & 0xFF);
+                
+                // Send GET command with offset in P1|P2
+                byte[] response = sendCommand(INS_GET, p1, p2, null);
+                
+                if (!isSuccess(response)) {
+                    System.out.println("[PHOTO] GET_AVATAR stopped, SW not 0x9000");
+                    break;
                 }
-            } else {
-                System.out.println("[PHOTO] No avatar on card or not authorized");
+                
+                byte[] data = getResponseData(response);
+                
+                System.out.println("[PHOTO] Chunk #" + i + " - offset=" + offset + 
+                        ", received=" + data.length + " bytes");
+                
+                // If empty response and offset=0, no avatar on card
+                if (data.length == 0) {
+                    if (offset == 0) {
+                        System.out.println("[PHOTO] No avatar on card");
+                        return null;
+                    }
+                    // End of data
+                    break;
+                }
+                
+                fullAvatar.write(data);
+                offset += data.length;
+                
+                // If received less than max chunk size, we're done
+                if (data.length < 240) {
+                    break;
+                }
+            }
+            
+            byte[] photoData = fullAvatar.toByteArray();
+            
+            if (photoData.length == 0) {
+                System.out.println("[PHOTO] No avatar data received");
                 return null;
             }
+            
+            System.out.println("[PHOTO] Download successful! Total: " + photoData.length + " bytes");
+            
+            // Debug: show first bytes to verify JPEG header
+            StringBuilder firstBytes = new StringBuilder("[PHOTO] First 16 bytes: ");
+            for (int i = 0; i < Math.min(16, photoData.length); i++) {
+                firstBytes.append(String.format("%02X ", photoData[i] & 0xFF));
+            }
+            System.out.println(firstBytes.toString());
+            
+            // JPEG should start with FF D8 FF
+            if (photoData.length >= 2 &&
+                    (photoData[0] & 0xFF) == 0xFF &&
+                    (photoData[1] & 0xFF) == 0xD8) {
+                System.out.println("[PHOTO] Valid JPEG header detected!");
+            } else {
+                System.err.println("[PHOTO] WARNING: Data does not have JPEG header!");
+            }
+            
+            return photoData;
 
         } catch (Exception e) {
             System.err.println("[PHOTO] Download failed: " + e.getMessage());
@@ -986,6 +997,7 @@ public class CardService {
 
     /**
      * Legacy method for backward compatibility
+     * Uses chunked transfer for reliable download
      */
     public byte[] downloadPhoto() {
         return downloadAvatar();

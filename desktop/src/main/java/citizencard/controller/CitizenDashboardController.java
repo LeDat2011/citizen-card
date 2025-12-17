@@ -1185,7 +1185,8 @@ public class CitizenDashboardController {
         javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
         fileChooser.setTitle("Chọn ảnh đại diện");
         fileChooser.getExtensionFilters().addAll(
-                new javafx.stage.FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif"));
+                new javafx.stage.FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif",
+                        "*.webp"));
 
         java.io.File selectedFile = fileChooser.showOpenDialog(root.getScene().getWindow());
         if (selectedFile != null) {

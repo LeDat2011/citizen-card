@@ -225,9 +225,11 @@ public class DemoWorkflowController {
             javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
             fileChooser.setTitle("Chọn ảnh cá nhân");
             fileChooser.getExtensionFilters().addAll(
-                    new javafx.stage.FileChooser.ExtensionFilter("Ảnh", "*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"),
+                    new javafx.stage.FileChooser.ExtensionFilter("Ảnh", "*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif",
+                            "*.webp"),
                     new javafx.stage.FileChooser.ExtensionFilter("JPEG", "*.jpg", "*.jpeg"),
                     new javafx.stage.FileChooser.ExtensionFilter("PNG", "*.png"),
+                    new javafx.stage.FileChooser.ExtensionFilter("WebP", "*.webp"),
                     new javafx.stage.FileChooser.ExtensionFilter("Tất cả", "*.*"));
 
             java.io.File file = fileChooser.showOpenDialog(dialog.getOwner());
@@ -502,11 +504,18 @@ public class DemoWorkflowController {
             field.getStyleClass().removeAll("field-error");
             field.getStyleClass().add("field-valid");
             errorLabel.setVisible(false);
+            errorLabel.setManaged(false);
         } else {
             field.getStyleClass().removeAll("field-valid");
             field.getStyleClass().add("field-error");
             errorLabel.setText(result.getErrorMessage());
+            // Ensure error label has red color - apply inline style as backup
+            errorLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 12px;");
+            if (!errorLabel.getStyleClass().contains("validation-error")) {
+                errorLabel.getStyleClass().add("validation-error");
+            }
             errorLabel.setVisible(true);
+            errorLabel.setManaged(true);
         }
     }
 

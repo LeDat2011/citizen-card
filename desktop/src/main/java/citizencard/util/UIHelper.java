@@ -85,8 +85,14 @@ public class UIHelper {
         Alert alert = new Alert(AlertType.ERROR);
         alert.setTitle(title);
         alert.setHeaderText("❌ " + title);
-        alert.setContentText(message);
-        alert.getDialogPane().getStyleClass().add("validation-alert"); // Optional specific style
+
+        // Use styled label for red text
+        Label contentLabel = new Label(message);
+        contentLabel.setWrapText(true);
+        contentLabel.getStyleClass().add("dialog-message-error");
+        alert.getDialogPane().setContent(contentLabel);
+
+        // alert.getDialogPane().getStyleClass().add("validation-alert"); // Optional
         styleDialog(alert);
         alert.showAndWait();
     }
