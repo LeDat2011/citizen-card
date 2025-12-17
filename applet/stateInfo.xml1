@@ -4,5 +4,10 @@
 <Node>citizen_applet</Node>
 </PkgNodes>
 </ExpandNodes>
-<FileNodes/>
+<FileNodes>
+<fnode>
+<fileName>src\citizen_applet\citizen_applet.java</fileName>
+<line>23</line>
+</fnode>
+</FileNodes>
 </StateInfo>

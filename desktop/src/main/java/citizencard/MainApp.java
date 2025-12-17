@@ -21,30 +21,34 @@ public class MainApp extends Application {
             // Initialize minimal database
             CardDAO.getInstance();
             System.out.println("✅ Database initialized");
-            
+
+            // Fixed window size for all screens
+            final double WINDOW_WIDTH = 1200;
+            final double WINDOW_HEIGHT = 850;
+
             LoginViewController loginController = new LoginViewController();
-            Scene scene = new Scene(loginController.getRoot(), 900, 700);
-            
+            Scene scene = new Scene(loginController.getRoot(), WINDOW_WIDTH, WINDOW_HEIGHT);
+
             // Load CSS
             scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
-            
+
             primaryStage.setTitle("Citizen Card Management System");
             primaryStage.setScene(scene);
-            primaryStage.setResizable(true);
-            primaryStage.setMinWidth(700);
-            primaryStage.setMinHeight(600);
+            primaryStage.setResizable(false); // Fixed size - no resize
+            primaryStage.setWidth(WINDOW_WIDTH);
+            primaryStage.setHeight(WINDOW_HEIGHT);
             primaryStage.centerOnScreen();
             primaryStage.show();
-            
+
             System.out.println("🚀 Citizen Card Management System started");
             System.out.println("📱 Please insert your Citizen Card and ensure JCIDE terminal is running");
-            
+
         } catch (Exception e) {
             System.err.println("❌ Error starting application: " + e.getMessage());
             e.printStackTrace();
         }
     }
-    
+
     @Override
     public void stop() {
         System.out.println("👋 Application shutting down");

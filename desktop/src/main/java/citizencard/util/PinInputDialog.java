@@ -46,6 +46,46 @@ public class PinInputDialog extends Dialog<String> {
         // Add CSS styling
         getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
         getDialogPane().getStyleClass().add("pin-dialog");
+        
+        // Force center dialog on screen - multiple attempts
+        setOnShowing(event -> centerDialog());
+        setOnShown(event -> {
+            centerDialog();
+            // Force center again after a short delay
+            javafx.application.Platform.runLater(() -> {
+                try {
+                    Thread.sleep(50);
+                    javafx.application.Platform.runLater(() -> centerDialog());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        });
+    }
+    
+    private void centerDialog() {
+        try {
+            javafx.stage.Window window = getDialogPane().getScene().getWindow();
+            if (window != null && window instanceof javafx.stage.Stage) {
+                javafx.stage.Stage stage = (javafx.stage.Stage) window;
+                
+                // Get screen bounds
+                javafx.stage.Screen screen = javafx.stage.Screen.getPrimary();
+                javafx.geometry.Rectangle2D bounds = screen.getVisualBounds();
+                
+                // Calculate center position
+                double centerX = bounds.getMinX() + (bounds.getWidth() - stage.getWidth()) / 2;
+                double centerY = bounds.getMinY() + (bounds.getHeight() - stage.getHeight()) / 2;
+                
+                // Set position
+                stage.setX(centerX);
+                stage.setY(centerY);
+                
+                System.out.println("[DEBUG] PIN dialog centered at: " + centerX + ", " + centerY);
+            }
+        } catch (Exception e) {
+            System.err.println("[WARN] Could not center dialog: " + e.getMessage());
+        }
     }
     
     private void createContent() {

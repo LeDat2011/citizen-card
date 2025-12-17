@@ -1,27 +1,33 @@
 package citizencard.service;
 
+import citizencard.util.RSAUtils;
 import javax.smartcardio.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.util.List;
 
 /**
- * Smart Card Communication Service
+ * Smart Card Communication Service v2.0
  * 
  * All-in-one service for Smart Card communication
- * Includes APDU commands and card operations
+ * Includes APDU commands, card operations, and RSA authentication
  */
 public class CardService {
-    
+
     // =====================================================
     // APDU COMMAND STRUCTURE v2.0 - Must match Applet
     // =====================================================
-    
+
     // INS CODES
     private static final byte INS_VERIFY = (byte) 0x00;
     private static final byte INS_CREATE = (byte) 0x01;
     private static final byte INS_GET = (byte) 0x02;
     private static final byte INS_UPDATE = (byte) 0x03;
     private static final byte INS_RESET_TRY_PIN = (byte) 0x10;
-    
+    private static final byte INS_CLEAR_CARD = (byte) 0x11;
+
     // P1 PARAMETERS (Command Type)
     private static final byte P1_PIN = (byte) 0x04;
     private static final byte P1_CITIZEN_INFO = (byte) 0x05;
@@ -29,7 +35,7 @@ public class CardService {
     private static final byte P1_FORGET_PIN = (byte) 0x0A;
     private static final byte P1_ACTIVATE_CARD = (byte) 0x0B;
     private static final byte P1_DEACTIVATE_CARD = (byte) 0x0C;
-    
+
     // P2 PARAMETERS (Data Type)
     private static final byte P2_INFORMATION = (byte) 0x07;
     private static final byte P2_TRY_REMAINING = (byte) 0x08;
@@ -37,18 +43,38 @@ public class CardService {
     private static final byte P2_CARD_ID = (byte) 0x0A;
     private static final byte P2_PUBLIC_KEY = (byte) 0x0B;
     private static final byte P2_BALANCE = (byte) 0x0C;
-    
+
     // BALANCE UPDATE TYPES
     private static final byte BALANCE_TYPE_TOPUP = (byte) 0x01;
     private static final byte BALANCE_TYPE_PAYMENT = (byte) 0x02;
-    
+
     // AID của Citizen Card Applet (phải khớp với applet)
     private static final byte[] APPLET_AID = {
-        (byte) 0x11, (byte) 0x22, (byte) 0x33, (byte) 0x44, (byte) 0x55, (byte) 0x00
+            (byte) 0x11, (byte) 0x22, (byte) 0x33, (byte) 0x44, (byte) 0x55, (byte) 0x00
     };
+
+    // Singleton instance
+    private static CardService instance;
 
     private CardChannel channel;
     private boolean connected = false;
+
+    /**
+     * Get singleton instance
+     */
+    public static CardService getInstance() {
+        if (instance == null) {
+            instance = new CardService();
+        }
+        return instance;
+    }
+
+    /**
+     * Constructor - use getInstance() instead
+     */
+    public CardService() {
+        // Allow direct construction for backward compatibility
+    }
 
     /**
      * Connect to smart card and select applet
@@ -57,7 +83,7 @@ public class CardService {
         try {
             TerminalFactory factory = TerminalFactory.getDefault();
             List<CardTerminal> terminals = factory.terminals().list();
-            
+
             if (terminals.isEmpty()) {
                 System.out.println("❌ No card terminals found");
                 return false;
@@ -71,18 +97,18 @@ public class CardService {
 
             Card card = terminal.connect("T=1");
             channel = card.getBasicChannel();
-            
+
             // Select Citizen Card Applet
             byte[] selectCommand = buildSelectCommand(APPLET_AID);
             ResponseAPDU response = channel.transmit(new CommandAPDU(selectCommand));
-            
+
             if (response.getSW() == 0x9000) {
                 connected = true;
                 System.out.println("✅ Connected to Citizen Card successfully");
                 return true;
             } else {
-                System.out.println("❌ Failed to select Citizen Card applet: " + 
-                                 String.format("0x%04X", response.getSW()));
+                System.out.println("❌ Failed to select Citizen Card applet: " +
+                        String.format("0x%04X", response.getSW()));
                 return false;
             }
         } catch (Exception e) {
@@ -98,94 +124,338 @@ public class CardService {
         if (!connected || channel == null) {
             throw new RuntimeException("Not connected to card");
         }
-        
+
         try {
             byte[] command = buildCommandV2(ins, p1, p2, data);
+
+            // LOG APDU COMMAND BEFORE SENDING
+            System.out.println("\n" + "=".repeat(60));
+            System.out.println("📤 SENDING APDU COMMAND TO JCIDE:");
+            System.out.println("=".repeat(60));
+            System.out.println("🎯 FUNCTION: " + getFunctionDescription(command[1], command[2], command[3]));
+            System.out.println("-".repeat(60));
+            System.out.println("CLA: " + String.format("0x%02X", command[0]));
+            System.out.println("INS: " + String.format("0x%02X", command[1]) + " (" + getInsName(command[1]) + ")");
+            System.out.println("P1:  " + String.format("0x%02X", command[2]) + " (" + getP1Name(command[2]) + ")");
+            System.out.println("P2:  " + String.format("0x%02X", command[3]) + " (" + getP2Name(command[3]) + ")");
+            System.out.println("Lc:  " + String.format("0x%02X", command[4]) + " (" + (command.length - 5) + " bytes)");
+
+            if (command.length > 5) {
+                System.out.print("Data: ");
+                for (int i = 5; i < command.length; i++) {
+                    System.out.print(String.format("%02X ", command[i]));
+                    if ((i - 4) % 16 == 0 && i < command.length - 1) {
+                        System.out.print("\n      ");
+                    }
+                }
+                System.out.println();
+            }
+
+            System.out.print("Full APDU: ");
+            for (byte b : command) {
+                System.out.print(String.format("%02X ", b));
+            }
+            System.out.println("\n" + "=".repeat(60));
+
             CommandAPDU commandAPDU = new CommandAPDU(command);
             ResponseAPDU response = channel.transmit(commandAPDU);
-            
+
+            // LOG RESPONSE
+            System.out.println("📥 RECEIVED RESPONSE FROM JCIDE:");
+            System.out.println("=".repeat(60));
+            System.out.println("SW:   " + String.format("0x%04X", response.getSW()) + " ("
+                    + getSwDescription(response.getSW()) + ")");
+            System.out.println("SW1:  " + String.format("0x%02X", response.getSW1()));
+            System.out.println("SW2:  " + String.format("0x%02X", response.getSW2()));
+
+            byte[] responseData = response.getData();
+            if (responseData.length > 0) {
+                System.out.println("Data Length: " + responseData.length + " bytes");
+                System.out.print("Data: ");
+                for (int i = 0; i < responseData.length; i++) {
+                    System.out.print(String.format("%02X ", responseData[i]));
+                    if ((i + 1) % 16 == 0 && i < responseData.length - 1) {
+                        System.out.print("\n      ");
+                    }
+                }
+                System.out.println();
+            } else {
+                System.out.println("Data: (empty)");
+            }
+            System.out.println("=".repeat(60) + "\n");
+
             // Return full response (data + SW)
             return response.getBytes();
-            
+
         } catch (Exception e) {
+            System.err.println("❌ ERROR sending command: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Error sending command to card: " + e.getMessage(), e);
         }
     }
-    
 
-    
+    /**
+     * Get INS command name for logging
+     */
+    private String getInsName(byte ins) {
+        switch (ins) {
+            case INS_VERIFY:
+                return "VERIFY";
+            case INS_CREATE:
+                return "CREATE";
+            case INS_GET:
+                return "GET";
+            case INS_UPDATE:
+                return "UPDATE";
+            case INS_RESET_TRY_PIN:
+                return "RESET_TRY_PIN";
+            case INS_CLEAR_CARD:
+                return "CLEAR_CARD";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
+    /**
+     * Get P1 parameter name for logging
+     */
+    private String getP1Name(byte p1) {
+        switch (p1) {
+            case P1_PIN:
+                return "PIN";
+            case P1_CITIZEN_INFO:
+                return "CITIZEN_INFO";
+            case P1_SIGNATURE:
+                return "SIGNATURE";
+            case P1_FORGET_PIN:
+                return "FORGET_PIN";
+            case P1_ACTIVATE_CARD:
+                return "ACTIVATE_CARD";
+            case P1_DEACTIVATE_CARD:
+                return "DEACTIVATE_CARD";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
+    /**
+     * Get P2 parameter name for logging
+     */
+    private String getP2Name(byte p2) {
+        switch (p2) {
+            case P2_INFORMATION:
+                return "INFORMATION";
+            case P2_TRY_REMAINING:
+                return "TRY_REMAINING";
+            case P2_AVATAR:
+                return "AVATAR";
+            case P2_CARD_ID:
+                return "CARD_ID";
+            case P2_PUBLIC_KEY:
+                return "PUBLIC_KEY";
+            case P2_BALANCE:
+                return "BALANCE";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
+    /**
+     * Get status word description for logging
+     */
+    private String getSwDescription(int sw) {
+        switch (sw) {
+            case 0x9000:
+                return "SUCCESS";
+            case 0x6300:
+                return "VERIFICATION_FAILED";
+            case 0x6983:
+                return "AUTHENTICATION_BLOCKED";
+            case 0x6985:
+                return "CONDITIONS_NOT_SATISFIED";
+            case 0x6A80:
+                return "INCORRECT_DATA";
+            case 0x6A86:
+                return "INCORRECT_P1_P2";
+            case 0x6D00:
+                return "INS_NOT_SUPPORTED";
+            case 0x6E00:
+                return "CLA_NOT_SUPPORTED";
+            case 0x6F00:
+                return "UNHANDLED_EXCEPTION (Internal applet error)";
+            default:
+                return "ERROR";
+        }
+    }
+
+    /**
+     * Get function description for logging
+     */
+    private String getFunctionDescription(byte ins, byte p1, byte p2) {
+        // INS_VERIFY (0x00)
+        if (ins == INS_VERIFY && p1 == P1_PIN) {
+            return "Verify PIN - Authenticate user with PIN";
+        }
+
+        // INS_CREATE (0x01)
+        if (ins == INS_CREATE && p1 == P1_PIN) {
+            return "Initialize Card - Create new card with PIN";
+        }
+        if (ins == INS_CREATE && p1 == P1_CITIZEN_INFO && p2 == P2_AVATAR) {
+            return "Upload Avatar - Store encrypted photo";
+        }
+
+        // INS_GET (0x02)
+        if (ins == INS_GET && p2 == P2_CARD_ID) {
+            return "Get Card ID - Retrieve unique card identifier";
+        }
+        if (ins == INS_GET && p2 == P2_PUBLIC_KEY) {
+            return "Get Public Key - Export RSA public key";
+        }
+        if (ins == INS_GET && p2 == P2_BALANCE) {
+            return "Get Balance - Retrieve decrypted balance";
+        }
+        if (ins == INS_GET && p2 == P2_TRY_REMAINING) {
+            return "Get Remaining Tries - Check PIN attempts left";
+        }
+        if (ins == INS_GET && p1 == P1_CITIZEN_INFO && p2 == P2_INFORMATION) {
+            return "Get Personal Info - Retrieve decrypted citizen data";
+        }
+        if (ins == INS_GET && p1 == P1_CITIZEN_INFO && p2 == P2_AVATAR) {
+            return "Get Avatar - Download decrypted photo";
+        }
+
+        // INS_UPDATE (0x03)
+        if (ins == INS_UPDATE && p1 == P1_PIN) {
+            return "Change PIN - Update PIN with old/new verification";
+        }
+        if (ins == INS_UPDATE && p1 == P1_CITIZEN_INFO && p2 == P2_INFORMATION) {
+            return "Update Personal Info - Store encrypted citizen data";
+        }
+        if (ins == INS_UPDATE && p1 == P1_CITIZEN_INFO && p2 == P2_AVATAR) {
+            return "Update Avatar - Replace encrypted photo";
+        }
+        if (ins == INS_UPDATE && p1 == P1_CITIZEN_INFO && p2 == P2_BALANCE) {
+            return "Update Balance - Top-up or Payment";
+        }
+        if (ins == INS_UPDATE && p1 == P1_ACTIVATE_CARD) {
+            return "Activate Card - Enable card with PIN";
+        }
+        if (ins == INS_UPDATE && p1 == P1_DEACTIVATE_CARD) {
+            return "Deactivate Card - Disable card";
+        }
+        if (ins == INS_UPDATE && p1 == P1_FORGET_PIN) {
+            return "Forget PIN - Admin reset PIN";
+        }
+
+        // INS_RESET_TRY_PIN (0x10)
+        if (ins == INS_RESET_TRY_PIN) {
+            return "Reset PIN Tries - Admin unlock blocked card";
+        }
+
+        // INS_CLEAR_CARD (0x11)
+        if (ins == INS_CLEAR_CARD) {
+            return "Clear Card - Factory reset (keep RSA keys)";
+        }
+
+        return "Unknown Function";
+    }
+
     // =====================================================
     // APDU BUILDERS v2.0
     // =====================================================
-    
+
     private byte[] buildCommandV2(byte ins, byte p1, byte p2, byte[] data) {
         if (data == null || data.length == 0) {
             return new byte[] { (byte) 0x00, ins, p1, p2, (byte) 0x00 };
         } else {
             byte[] command = new byte[5 + data.length];
             command[0] = (byte) 0x00; // CLA
-            command[1] = ins;         // INS
-            command[2] = p1;          // P1
-            command[3] = p2;          // P2
+            command[1] = ins; // INS
+            command[2] = p1; // P1
+            command[3] = p2; // P2
             command[4] = (byte) data.length; // Lc
             System.arraycopy(data, 0, command, 5, data.length);
             return command;
         }
     }
-    
+
     private byte[] buildPinData(String pin) {
         if (pin.length() != 4) {
             throw new IllegalArgumentException("PIN must be 4 digits");
         }
         return pin.getBytes();
     }
-    
+
     private byte[] buildAmountData(int amount) {
         return new byte[] {
-            (byte) (amount >> 24),
-            (byte) (amount >> 16),
-            (byte) (amount >> 8),
-            (byte) (amount & 0xFF)
+                (byte) (amount >> 24),
+                (byte) (amount >> 16),
+                (byte) (amount >> 8),
+                (byte) (amount & 0xFF)
         };
     }
-    
+
     private int parseAmount(byte[] response) {
         if (response.length < 4) {
             throw new IllegalArgumentException("Response too short for amount");
         }
         return ((response[0] & 0xFF) << 24) |
-               ((response[1] & 0xFF) << 16) |
-               ((response[2] & 0xFF) << 8) |
-               (response[3] & 0xFF);
+                ((response[1] & 0xFF) << 16) |
+                ((response[2] & 0xFF) << 8) |
+                (response[3] & 0xFF);
     }
-    
+
     private boolean isSuccess(byte[] response) {
-        if (response.length < 2) return false;
-        int sw = ((response[response.length - 2] & 0xFF) << 8) | 
-                 (response[response.length - 1] & 0xFF);
+        if (response.length < 2)
+            return false;
+        int sw = ((response[response.length - 2] & 0xFF) << 8) |
+                (response[response.length - 1] & 0xFF);
         return sw == 0x9000;
     }
-    
+
     private byte[] getResponseData(byte[] response) {
-        if (response.length <= 2) return new byte[0];
+        if (response.length <= 2)
+            return new byte[0];
         byte[] data = new byte[response.length - 2];
         System.arraycopy(response, 0, data, 0, data.length);
         return data;
     }
 
     /**
-     * Initialize new card with PIN (v2.0)
+     * Initialize new card with PIN and Card ID (v2.0)
+     * Format: [PIN:4][cardIdLength:1][cardId:N]
      */
-    public String initializeCard(String pin) {
+    public String initializeCard(String pin, String cardId) {
         byte[] pinData = buildPinData(pin);
-        byte[] response = sendCommand(INS_CREATE, P1_PIN, (byte) 0x00, pinData);
-        
+        byte[] cardIdBytes = cardId.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        // Build data: [PIN:4][length:1][cardId:N]
+        byte[] data = new byte[pinData.length + 1 + cardIdBytes.length];
+        System.arraycopy(pinData, 0, data, 0, pinData.length);
+        data[pinData.length] = (byte) cardIdBytes.length;
+        System.arraycopy(cardIdBytes, 0, data, pinData.length + 1, cardIdBytes.length);
+
+        System.out.println("[CARD] Initializing with ID: " + cardId + " (" + cardIdBytes.length + " bytes)");
+
+        byte[] response = sendCommand(INS_CREATE, P1_PIN, (byte) 0x00, data);
+
         if (isSuccess(response)) {
-            byte[] cardIdData = getResponseData(response);
-            return new String(cardIdData).trim();
+            byte[] responseData = getResponseData(response);
+            // Response contains Card ID + Public Key, extract Card ID
+            String returnedId = new String(responseData, 0, Math.min(cardIdBytes.length, responseData.length));
+            System.out.println("[CARD] Card initialized with ID: " + returnedId);
+            return returnedId.trim();
         } else {
             throw new RuntimeException("Failed to initialize card");
         }
+    }
+
+    /**
+     * Legacy method for backward compatibility (generates default ID)
+     */
+    public String initializeCard(String pin) {
+        return initializeCard(pin, "CITIZEN-0001");
     }
 
     /**
@@ -194,7 +464,7 @@ public class CardService {
     public PinVerificationResult verifyPin(String pin) {
         byte[] pinData = buildPinData(pin);
         byte[] response = sendCommand(INS_VERIFY, P1_PIN, (byte) 0x00, pinData);
-        
+
         if (isSuccess(response)) {
             byte[] data = getResponseData(response);
             if (data.length >= 2) {
@@ -203,11 +473,11 @@ public class CardService {
                 return new PinVerificationResult(success, remainingTries);
             }
         }
-        
+
         // If we get here, something went wrong
         return new PinVerificationResult(false, 0);
     }
-    
+
     /**
      * Legacy method for backward compatibility
      */
@@ -218,14 +488,14 @@ public class CardService {
         }
         return result.success;
     }
-    
+
     /**
      * PIN verification result class
      */
     public static class PinVerificationResult {
         public final boolean success;
         public final int remainingTries;
-        
+
         public PinVerificationResult(boolean success, int remainingTries) {
             this.success = success;
             this.remainingTries = remainingTries;
@@ -237,7 +507,7 @@ public class CardService {
      */
     public String getCardId() {
         byte[] response = sendCommand(INS_GET, (byte) 0x00, P2_CARD_ID, null);
-        
+
         if (isSuccess(response)) {
             byte[] cardIdData = getResponseData(response);
             return new String(cardIdData).trim();
@@ -251,7 +521,7 @@ public class CardService {
      */
     public byte[] getPublicKey() {
         byte[] response = sendCommand(INS_GET, (byte) 0x00, P2_PUBLIC_KEY, null);
-        
+
         if (isSuccess(response)) {
             return getResponseData(response);
         } else {
@@ -264,7 +534,7 @@ public class CardService {
      */
     public int getBalance() {
         byte[] response = sendCommand(INS_GET, (byte) 0x00, P2_BALANCE, null);
-        
+
         if (isSuccess(response)) {
             byte[] balanceData = getResponseData(response);
             return parseAmount(balanceData);
@@ -283,9 +553,9 @@ public class CardService {
         data[2] = (byte) (amount >> 16);
         data[3] = (byte) (amount >> 8);
         data[4] = (byte) (amount & 0xFF);
-        
+
         byte[] response = sendCommand(INS_UPDATE, P1_CITIZEN_INFO, P2_BALANCE, data);
-        
+
         if (isSuccess(response)) {
             byte[] newBalanceData = getResponseData(response);
             return parseAmount(newBalanceData);
@@ -294,7 +564,7 @@ public class CardService {
             throw new RuntimeException("Failed to " + operation + " balance");
         }
     }
-    
+
     /**
      * Top up balance (v2.0)
      */
@@ -316,7 +586,7 @@ public class CardService {
         byte[] pinData = new byte[8]; // 4 bytes old + 4 bytes new
         System.arraycopy(buildPinData(oldPin), 0, pinData, 0, 4);
         System.arraycopy(buildPinData(newPin), 0, pinData, 4, 4);
-        
+
         byte[] response = sendCommand(INS_UPDATE, P1_PIN, (byte) 0x00, pinData);
         return isSuccess(response);
     }
@@ -343,62 +613,77 @@ public class CardService {
     public boolean isConnected() {
         return connected && channel != null;
     }
-    
+
     // =====================================================
     // ADDITIONAL v2.0 METHODS
     // =====================================================
-    
+
     /**
      * Get remaining PIN tries (v2.0)
      */
     public int getRemainingPinTries() {
         byte[] response = sendCommand(INS_GET, (byte) 0x00, P2_TRY_REMAINING, null);
-        
+
         if (isSuccess(response)) {
             byte[] data = getResponseData(response);
             if (data.length > 0) {
                 return data[0] & 0xFF;
             }
         }
-        
+
         throw new RuntimeException("Failed to get remaining PIN tries");
     }
-    
+
     /**
      * Reset PIN tries (v2.0) - Admin function
      */
     public int resetPinTries() {
         byte[] response = sendCommand(INS_RESET_TRY_PIN, (byte) 0x00, (byte) 0x00, null);
-        
+
         if (isSuccess(response)) {
             byte[] data = getResponseData(response);
             if (data.length > 0) {
                 return data[0] & 0xFF;
             }
         }
-        
+
         throw new RuntimeException("Failed to reset PIN tries");
     }
-    
+
+    /**
+     * Clear card data (v2.0) - Admin function to reset card
+     * Clears all data and resets card to initial state
+     */
+    public boolean clearCard() {
+        byte[] response = sendCommand(INS_CLEAR_CARD, (byte) 0x00, (byte) 0x00, null);
+
+        if (isSuccess(response)) {
+            byte[] data = getResponseData(response);
+            return data.length > 0 && data[0] == 0x01;
+        }
+
+        return false;
+    }
+
     /**
      * Activate card (v2.0) - Requires PIN
      */
     public boolean activateCard(String pin) {
         byte[] pinData = buildPinData(pin);
         byte[] response = sendCommand(INS_UPDATE, P1_ACTIVATE_CARD, (byte) 0x00, pinData);
-        
+
         return isSuccess(response);
     }
-    
+
     /**
      * Deactivate card (v2.0) - Requires PIN verification first
      */
     public boolean deactivateCard() {
         byte[] response = sendCommand(INS_UPDATE, P1_DEACTIVATE_CARD, (byte) 0x00, null);
-        
+
         return isSuccess(response);
     }
-    
+
     /**
      * Sign data with RSA private key (v2.0) - Requires PIN verification
      */
@@ -406,16 +691,16 @@ public class CardService {
         if (data == null || data.length == 0) {
             throw new IllegalArgumentException("Data to sign is empty");
         }
-        
+
         byte[] response = sendCommand(INS_UPDATE, P1_SIGNATURE, (byte) 0x00, data);
-        
+
         if (isSuccess(response)) {
             return getResponseData(response);
         } else {
             throw new RuntimeException("Failed to sign data - PIN verification required");
         }
     }
-    
+
     /**
      * Update personal information (v2.0) - Requires PIN verification
      */
@@ -423,179 +708,267 @@ public class CardService {
         if (infoData == null || infoData.length == 0) {
             throw new IllegalArgumentException("Info data is empty");
         }
-        
+
         if (infoData.length > 256) {
             throw new IllegalArgumentException("Info data too large (max 256 bytes)");
         }
-        
+
         byte[] response = sendCommand(INS_UPDATE, P1_CITIZEN_INFO, P2_INFORMATION, infoData);
-        
+
         return isSuccess(response);
     }
-    
+
     /**
      * Get personal information (v2.0) - Requires PIN verification
      */
     public byte[] getPersonalInfo() {
         byte[] response = sendCommand(INS_GET, P1_CITIZEN_INFO, P2_INFORMATION, null);
-        
+
         if (isSuccess(response)) {
             return getResponseData(response);
         } else {
             throw new RuntimeException("Failed to get personal info - PIN verification required");
         }
     }
-    
+
     /**
      * Forget PIN (v2.0) - Admin function to reset PIN
      */
     public boolean forgetPin(String newPin) {
         byte[] pinData = buildPinData(newPin);
         byte[] response = sendCommand(INS_UPDATE, P1_FORGET_PIN, (byte) 0x00, pinData);
-        
+
         return isSuccess(response);
     }
 
     // =====================================================
-    // PHOTO MANAGEMENT METHODS v2.0 (Chunked Transfer)
+    // CHALLENGE-RESPONSE AUTHENTICATION
     // =====================================================
-    
-    // Photo Transfer INS Codes (match applet)
-    private static final byte INS_PHOTO_START = (byte) 0x50;
-    private static final byte INS_PHOTO_DATA = (byte) 0x51;
-    private static final byte INS_PHOTO_END = (byte) 0x52;
-    private static final byte INS_PHOTO_GET_SIZE = (byte) 0x53;
-    private static final byte INS_PHOTO_GET_DATA = (byte) 0x54;
-    
-    private static final int CHUNK_SIZE = 200;  // Match applet
-    
+
+    private static final SecureRandom secureRandom = new SecureRandom();
+    private PublicKey cachedPublicKey = null;
+
     /**
-     * Upload avatar to card (v2.0 - Chunked transfer, max 8KB)
-     * @param avatarData Avatar bytes (should be compressed JPEG, max 8KB)
+     * Challenge card with random data and verify signature
+     * This authenticates that the card has the correct private key
+     * 
+     * @return true if card is authentic
+     */
+    public boolean challengeCard() {
+        try {
+            // Generate random challenge
+            byte[] challenge = new byte[16];
+            secureRandom.nextBytes(challenge);
+            String challengeStr = bytesToHex(challenge);
+
+            System.out.println("[AUTH] Challenge: " + challengeStr);
+
+            // Get public key if not cached
+            if (cachedPublicKey == null) {
+                byte[] pubKeyData = getPublicKey();
+                cachedPublicKey = RSAUtils.generatePublicKeyFromBytes(pubKeyData);
+
+                if (cachedPublicKey == null) {
+                    System.err.println("[AUTH] Failed to parse public key");
+                    return false;
+                }
+            }
+
+            // Send challenge to card for signing
+            byte[] response = sendCommand(INS_CREATE, P1_SIGNATURE, (byte) 0x00, challengeStr.getBytes());
+
+            if (!isSuccess(response)) {
+                System.err.println("[AUTH] Card did not sign challenge");
+                return false;
+            }
+
+            byte[] signature = getResponseData(response);
+            System.out.println("[AUTH] Received signature: " + signature.length + " bytes");
+
+            // Verify signature
+            boolean valid = RSAUtils.verifySignature(signature, cachedPublicKey, challengeStr);
+
+            if (valid) {
+                System.out.println("[AUTH] Card authentication SUCCESSFUL");
+            } else {
+                System.err.println("[AUTH] Card authentication FAILED - Invalid signature");
+            }
+
+            return valid;
+
+        } catch (Exception e) {
+            System.err.println("[AUTH] Challenge failed: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Clear cached public key (call when switching cards)
+     */
+    public void clearPublicKeyCache() {
+        cachedPublicKey = null;
+    }
+
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
+    }
+
+    // =====================================================
+    // PHOTO MANAGEMENT METHODS v2.0 (Extended APDU)
+    // =====================================================
+
+    private static final int MAX_AVATAR_SIZE = 15360; // 15KB
+
+    /**
+     * Upload avatar to card using Extended APDU (supports up to 15KB)
+     * 
+     * @param avatarData Avatar bytes (max 15KB)
      * @return true if successful
      */
     public boolean uploadAvatar(byte[] avatarData) {
         if (!connected || channel == null) {
             throw new RuntimeException("Not connected to card");
         }
-        
+
         if (avatarData == null || avatarData.length == 0) {
             throw new IllegalArgumentException("Avatar data is empty");
         }
-        
-        if (avatarData.length > 8192) { // 8KB max for JavaCard 2.2.1
-            throw new IllegalArgumentException("Avatar too large (max 8KB)");
+
+        if (avatarData.length > MAX_AVATAR_SIZE) {
+            throw new IllegalArgumentException("Avatar too large (max " + MAX_AVATAR_SIZE + " bytes)");
         }
-        
+
         try {
-            System.out.println("[PHOTO] Starting chunked upload, size: " + avatarData.length + " bytes");
-            
-            // Step 1: Start upload - send total size
-            byte[] sizeData = new byte[2];
-            sizeData[0] = (byte) (avatarData.length >> 8);
-            sizeData[1] = (byte) (avatarData.length & 0xFF);
-            
-            byte[] response = sendCommand(INS_PHOTO_START, (byte) 0x00, (byte) 0x00, sizeData);
-            if (!isSuccess(response)) {
-                throw new RuntimeException("Failed to start photo upload");
-            }
-            
-            // Step 2: Send chunks
-            int totalChunks = (avatarData.length + CHUNK_SIZE - 1) / CHUNK_SIZE;
-            System.out.println("[PHOTO] Sending " + totalChunks + " chunks...");
-            
-            for (int i = 0; i < totalChunks; i++) {
-                int offset = i * CHUNK_SIZE;
-                int chunkLen = Math.min(CHUNK_SIZE, avatarData.length - offset);
-                
-                // Prepare chunk data
-                byte[] chunkData = new byte[chunkLen];
-                System.arraycopy(avatarData, offset, chunkData, 0, chunkLen);
-                
-                // Send chunk with index in P1P2
-                byte p1 = (byte) (i >> 8);
-                byte p2 = (byte) (i & 0xFF);
-                response = sendCommand(INS_PHOTO_DATA, p1, p2, chunkData);
-                
+            System.out.println("[PHOTO] Uploading avatar with chunked transfer: " + avatarData.length + " bytes");
+
+            // Use chunked transfer (max 200 bytes per chunk)
+            final int CHUNK_SIZE = 200;
+            int offset = 0;
+            int chunkNum = 0;
+
+            while (offset < avatarData.length) {
+                int remaining = avatarData.length - offset;
+                int chunkLen = Math.min(CHUNK_SIZE, remaining);
+                boolean isLastChunk = (offset + chunkLen >= avatarData.length);
+
+                // Build chunk: [totalLen:2][offset:2][data:N]
+                byte[] chunk = new byte[chunkLen + 4];
+
+                // Header
+                chunk[0] = (byte) ((avatarData.length >> 8) & 0xFF);
+                chunk[1] = (byte) (avatarData.length & 0xFF);
+                chunk[2] = (byte) ((offset >> 8) & 0xFF);
+                chunk[3] = (byte) (offset & 0xFF);
+
+                // Copy chunk data
+                System.arraycopy(avatarData, offset, chunk, 4, chunkLen);
+
+                // P2: bit 7 = 1 if more chunks coming
+                byte p2 = isLastChunk ? P2_AVATAR : (byte) (P2_AVATAR | 0x80);
+
+                byte[] response = sendCommand(INS_CREATE, P1_CITIZEN_INFO, p2, chunk);
+
                 if (!isSuccess(response)) {
-                    throw new RuntimeException("Failed to upload chunk " + i);
+                    System.err.println("[PHOTO] Chunk " + (chunkNum + 1) + " upload failed");
+                    return false;
                 }
-                
-                System.out.println("[PHOTO] Chunk " + (i + 1) + "/" + totalChunks + " sent");
+
+                offset += chunkLen;
+                chunkNum++;
+                System.out.println("[PHOTO] Chunk " + chunkNum + " uploaded (" + chunkLen + " bytes)");
             }
-            
-            // Step 3: Finish upload
-            response = sendCommand(INS_PHOTO_END, (byte) 0x00, (byte) 0x00, null);
-            if (!isSuccess(response)) {
-                throw new RuntimeException("Failed to finish photo upload");
-            }
-            
-            System.out.println("[PHOTO] Upload completed successfully!");
+
+            System.out.println("[PHOTO] Upload successful! " + chunkNum + " chunks, " + avatarData.length + " bytes");
             return true;
-            
+
         } catch (Exception e) {
             System.err.println("[PHOTO] Upload failed: " + e.getMessage());
-            throw new RuntimeException("Photo upload failed: " + e.getMessage(), e);
+            return false;
         }
     }
-    
+
     /**
-     * Download avatar from card (v2.0 - Chunked transfer)
+     * Build Extended APDU with 3-byte LC
+     */
+    private byte[] buildExtendedAPDU(byte ins, byte p1, byte p2, byte[] data) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        baos.write(0x00); // CLA
+        baos.write(ins); // INS
+        baos.write(p1); // P1
+        baos.write(p2); // P2
+
+        int dataLen = (data == null) ? 0 : data.length;
+
+        // Extended APDU: 3-byte LC (0x00 + 2-byte length)
+        baos.write(0x00); // Extended length indicator
+        baos.write((dataLen >> 8) & 0xFF); // LC high byte
+        baos.write(dataLen & 0xFF); // LC low byte
+
+        if (data != null) {
+            baos.write(data);
+        }
+
+        return baos.toByteArray();
+    }
+
+    /**
+     * Download avatar from card (v2.0 - Simple APDU)
+     * 
      * @return Avatar bytes or null if no avatar
      */
     public byte[] downloadAvatar() {
         if (!connected || channel == null) {
             throw new RuntimeException("Not connected to card");
         }
-        
+
         try {
-            // Step 1: Get photo size
-            byte[] response = sendCommand(INS_PHOTO_GET_SIZE, (byte) 0x00, (byte) 0x00, null);
-            if (!isSuccess(response)) {
-                throw new RuntimeException("Failed to get photo size");
-            }
-            
-            byte[] data = getResponseData(response);
-            if (data.length < 2) {
-                return null; // No photo
-            }
-            
-            int photoSize = ((data[0] & 0xFF) << 8) | (data[1] & 0xFF);
-            if (photoSize == 0) {
-                return null; // No photo
-            }
-            
-            System.out.println("[PHOTO] Downloading, size: " + photoSize + " bytes");
-            
-            // Step 2: Download chunks
-            byte[] photoData = new byte[photoSize];
-            int totalChunks = (photoSize + CHUNK_SIZE - 1) / CHUNK_SIZE;
-            
-            for (int i = 0; i < totalChunks; i++) {
-                byte p1 = (byte) (i >> 8);
-                byte p2 = (byte) (i & 0xFF);
-                
-                response = sendCommand(INS_PHOTO_GET_DATA, p1, p2, null);
-                if (!isSuccess(response)) {
-                    throw new RuntimeException("Failed to download chunk " + i);
+            System.out.println("[PHOTO] Downloading avatar...");
+
+            // Use INS_GET with P1_CITIZEN_INFO and P2_AVATAR
+            byte[] response = sendCommand(INS_GET, P1_CITIZEN_INFO, P2_AVATAR, null);
+
+            if (isSuccess(response)) {
+                byte[] photoData = getResponseData(response);
+                if (photoData.length > 0) {
+                    System.out.println("[PHOTO] Download successful! Size: " + photoData.length + " bytes");
+
+                    // Debug: show first bytes to verify JPEG header
+                    StringBuilder firstBytes = new StringBuilder("[PHOTO] First 16 bytes: ");
+                    for (int i = 0; i < Math.min(16, photoData.length); i++) {
+                        firstBytes.append(String.format("%02X ", photoData[i] & 0xFF));
+                    }
+                    System.out.println(firstBytes.toString());
+
+                    // JPEG should start with FF D8 FF
+                    if (photoData.length >= 2 &&
+                            (photoData[0] & 0xFF) == 0xFF &&
+                            (photoData[1] & 0xFF) == 0xD8) {
+                        System.out.println("[PHOTO] Valid JPEG header detected!");
+                    } else {
+                        System.err.println("[PHOTO] WARNING: Data does not have JPEG header!");
+                    }
+
+                    return photoData;
+                } else {
+                    System.out.println("[PHOTO] No avatar stored on card");
+                    return null;
                 }
-                
-                data = getResponseData(response);
-                int offset = i * CHUNK_SIZE;
-                System.arraycopy(data, 0, photoData, offset, data.length);
-                
-                System.out.println("[PHOTO] Chunk " + (i + 1) + "/" + totalChunks + " received");
+            } else {
+                System.out.println("[PHOTO] No avatar on card or not authorized");
+                return null;
             }
-            
-            System.out.println("[PHOTO] Download completed!");
-            return photoData;
-            
+
         } catch (Exception e) {
             System.err.println("[PHOTO] Download failed: " + e.getMessage());
-            throw new RuntimeException("Photo download failed: " + e.getMessage(), e);
+            return null;
         }
     }
-    
+
     /**
      * Update existing avatar (v2.0) - Same as upload with chunked transfer
      */
@@ -603,14 +976,14 @@ public class CardService {
         // For chunked transfer, update is same as upload
         return uploadAvatar(avatarData);
     }
-    
+
     /**
      * Legacy method for backward compatibility
      */
     public boolean uploadPhoto(byte[] photoData) {
         return uploadAvatar(photoData);
     }
-    
+
     /**
      * Legacy method for backward compatibility
      */

@@ -10,7 +10,7 @@ import java.sql.*;
  */
 public class DatabaseViewer {
     
-    private static final String DB_URL = "jdbc:h2:file:./data/citizen_card;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1";
+    private static final String DB_URL = "jdbc:h2:file:./data/citizen_card;AUTO_SERVER=FALSE;DB_CLOSE_DELAY=-1;IFEXISTS=TRUE";
     private static final String WEB_CONSOLE_URL = "http://localhost:8082";
     private static Server webServer;
     
@@ -59,7 +59,7 @@ public class DatabaseViewer {
      */
     public static void printDatabaseContent() {
         System.out.println("📊 DATABASE CONTENT - CITIZEN CARD SYSTEM");
-        System.out.println("=" .repeat(60));
+        System.out.println("=".repeat(60));
         
         try (Connection conn = DriverManager.getConnection(DB_URL)) {
             
@@ -72,7 +72,33 @@ public class DatabaseViewer {
             
         } catch (SQLException e) {
             System.err.println("❌ Lỗi kết nối database: " + e.getMessage());
+            System.err.println("💡 Gợi ý: Đóng ứng dụng trước khi xem database, hoặc sử dụng H2 Console trong app");
         }
+    }
+    
+    /**
+     * Print database content using existing connection (for use within app)
+     */
+    public static String getDatabaseContentAsString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 DATABASE CONTENT - CITIZEN CARD SYSTEM\n");
+        sb.append("=".repeat(60)).append("\n\n");
+        
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+            
+            // Get registered cards
+            sb.append(getRegisteredCardsAsString(conn));
+            sb.append("\n\n");
+            
+            // Get transaction logs
+            sb.append(getTransactionLogsAsString(conn));
+            
+        } catch (SQLException e) {
+            sb.append("❌ Lỗi kết nối database: ").append(e.getMessage()).append("\n");
+            sb.append("💡 Database có thể đang được sử dụng bởi ứng dụng\n");
+        }
+        
+        return sb.toString();
     }
     
     private static void printRegisteredCards(Connection conn) throws SQLException {
@@ -105,6 +131,37 @@ public class DatabaseViewer {
         }
     }
     
+    private static String getRegisteredCardsAsString(Connection conn) throws SQLException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("🎫 REGISTERED CARDS:\n");
+        sb.append("-".repeat(60)).append("\n");
+        
+        String sql = "SELECT * FROM registered_cards ORDER BY registered_at DESC";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            if (!rs.next()) {
+                sb.append("   (Chưa có thẻ nào được đăng ký)\n");
+                return sb.toString();
+            }
+            
+            int count = 0;
+            do {
+                count++;
+                sb.append(String.format("Thẻ #%d:\n", count));
+                sb.append(String.format("  • ID: %d\n", rs.getInt("id")));
+                sb.append(String.format("  • Card ID: %s\n", rs.getString("card_id")));
+                sb.append(String.format("  • Status: %s\n", rs.getString("card_status")));
+                sb.append(String.format("  • Registered: %s\n", rs.getTimestamp("registered_at")));
+                sb.append(String.format("  • Last Access: %s\n\n", rs.getTimestamp("last_accessed")));
+            } while (rs.next());
+            
+            sb.append(String.format("Tổng số thẻ: %d\n", count));
+        }
+        
+        return sb.toString();
+    }
+    
     private static void printTransactionLogs(Connection conn) throws SQLException {
         System.out.println("📝 TRANSACTION LOGS (10 gần nhất):");
         System.out.println("-".repeat(60));
@@ -133,6 +190,37 @@ public class DatabaseViewer {
                 );
             } while (rs.next());
         }
+    }
+    
+    private static String getTransactionLogsAsString(Connection conn) throws SQLException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("📝 TRANSACTION LOGS (10 gần nhất):\n");
+        sb.append("-".repeat(60)).append("\n");
+        
+        String sql = "SELECT * FROM transaction_logs ORDER BY timestamp DESC LIMIT 10";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            if (!rs.next()) {
+                sb.append("   (Chưa có giao dịch nào)\n");
+                return sb.toString();
+            }
+            
+            int count = 0;
+            do {
+                count++;
+                String status = rs.getBoolean("success") ? "✅ Thành công" : "❌ Thất bại";
+                sb.append(String.format("%d. %s - %s (%s) - %s\n",
+                    count,
+                    rs.getString("card_id"),
+                    rs.getString("operation_type"),
+                    status,
+                    rs.getTimestamp("timestamp")
+                ));
+            } while (rs.next());
+        }
+        
+        return sb.toString();
     }
     
     /**

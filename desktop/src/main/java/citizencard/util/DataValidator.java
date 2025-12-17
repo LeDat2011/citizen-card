@@ -160,25 +160,26 @@ public class DataValidator {
     }
     
     /**
-     * Validate address
+     * Validate room number
      */
-    public static ValidationResult validateAddress(String address) {
-        if (address == null || address.trim().isEmpty()) {
-            return ValidationResult.error("Địa chỉ không được để trống");
+    public static ValidationResult validateRoomNumber(String roomNumber) {
+        if (roomNumber == null || roomNumber.trim().isEmpty()) {
+            return ValidationResult.error("Số phòng không được để trống");
         }
         
-        String trimmedAddress = address.trim();
+        String trimmedRoom = roomNumber.trim();
         
-        if (trimmedAddress.length() < 5) {
-            return ValidationResult.error("Địa chỉ phải có ít nhất 5 ký tự");
+        if (trimmedRoom.length() < 1) {
+            return ValidationResult.error("Số phòng phải có ít nhất 1 ký tự");
         }
         
-        if (trimmedAddress.length() > 200) {
-            return ValidationResult.error("Địa chỉ không được vượt quá 200 ký tự");
+        if (trimmedRoom.length() > 10) {
+            return ValidationResult.error("Số phòng không được vượt quá 10 ký tự");
         }
         
-        if (!ADDRESS_PATTERN.matcher(trimmedAddress).matches()) {
-            return ValidationResult.error("Địa chỉ chứa ký tự không hợp lệ");
+        // Allow alphanumeric room numbers (e.g., A101, B205, 301)
+        if (!trimmedRoom.matches("^[A-Za-z0-9]{1,10}$")) {
+            return ValidationResult.error("Số phòng chỉ được chứa chữ cái và số (VD: A101, B205, 301)");
         }
         
         return ValidationResult.success();
