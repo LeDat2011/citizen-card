@@ -14,6 +14,7 @@ import citizencard.service.CardService;
 import citizencard.dao.CardDAO;
 import citizencard.util.DatabaseViewer;
 import citizencard.util.DataValidator;
+import citizencard.util.UIHelper;
 
 /**
  * Simplified Admin Dashboard Controller
@@ -136,15 +137,7 @@ public class AdminDashboardController {
     }
 
     private Button createMenuButton(String text, String description) {
-        Button button = new Button(text);
-        button.getStyleClass().addAll("menu-button");
-        button.setPrefWidth(250);
-        button.setAlignment(Pos.CENTER_LEFT);
-
-        Tooltip tooltip = new Tooltip(description);
-        button.setTooltip(tooltip);
-
-        return button;
+        return UIHelper.createMenuButton(text, description, "menu-button");
     }
 
     private VBox createContentArea() {
@@ -190,29 +183,7 @@ public class AdminDashboardController {
     }
 
     private VBox createStatCard(String title, String value, String icon, String color) {
-        VBox card = new VBox(10);
-        card.setAlignment(Pos.CENTER_LEFT);
-        card.setPadding(new Insets(25));
-        card.getStyleClass().add("stat-card");
-        card.setPrefWidth(200);
-
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
-
-        Label iconLabel = new Label(icon);
-        iconLabel.setStyle("-fx-font-size: 24px;");
-
-        Label titleLabel = new Label(title);
-        titleLabel.getStyleClass().add("stat-title");
-
-        header.getChildren().addAll(iconLabel, titleLabel);
-
-        Label valueLabel = new Label(value);
-        valueLabel.getStyleClass().add("stat-value");
-        valueLabel.setStyle("-fx-text-fill: " + color + ";");
-
-        card.getChildren().addAll(header, valueLabel);
-        return card;
+        return UIHelper.createStatCard(title, value, icon, color);
     }
 
     private VBox createRecentActivitySection() {
@@ -1397,29 +1368,11 @@ public class AdminDashboardController {
      * Show validation alert
      */
     private void showValidationAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setHeaderText("❌ " + title);
-        alert.setContentText(message);
-
-        // Style the dialog
-        alert.getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
-        alert.getDialogPane().getStyleClass().add("validation-alert");
-
-        alert.showAndWait();
+        UIHelper.showErrorAlert(title, message);
     }
 
     private void showAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(message);
-
-        // Style the dialog
-        alert.getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
-        alert.getDialogPane().getStyleClass().add("alert-dialog");
-
-        alert.showAndWait();
+        UIHelper.showAlert(title, message);
     }
 
     /**
@@ -1602,11 +1555,7 @@ public class AdminDashboardController {
     }
 
     private void showSuccessAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(message);
-        alert.showAndWait();
+        UIHelper.showSuccessAlert(title, message);
     }
 
     public Parent getRoot() {

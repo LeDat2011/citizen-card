@@ -13,6 +13,7 @@ import citizencard.service.CardService;
 import citizencard.dao.CardDAO;
 import citizencard.util.DataValidator;
 import citizencard.util.PinInputDialog;
+import citizencard.util.UIHelper;
 
 /**
  * Simplified Citizen Dashboard Controller
@@ -319,15 +320,7 @@ public class CitizenDashboardController {
     }
 
     private Button createMenuButton(String text, String description) {
-        Button button = new Button(text);
-        button.getStyleClass().addAll("citizen-menu-button");
-        button.setPrefWidth(250);
-        button.setAlignment(Pos.CENTER_LEFT);
-
-        Tooltip tooltip = new Tooltip(description);
-        button.setTooltip(tooltip);
-
-        return button;
+        return UIHelper.createMenuButton(text, description, "citizen-menu-button");
     }
 
     private VBox createContentArea() {
@@ -409,29 +402,7 @@ public class CitizenDashboardController {
     }
 
     private VBox createStatCard(String title, String value, String icon, String color) {
-        VBox card = new VBox(10);
-        card.setAlignment(Pos.CENTER_LEFT);
-        card.setPadding(new Insets(25));
-        card.getStyleClass().add("citizen-stat-card");
-        card.setPrefWidth(200);
-
-        HBox header = new HBox(10);
-        header.setAlignment(Pos.CENTER_LEFT);
-
-        Label iconLabel = new Label(icon);
-        iconLabel.setStyle("-fx-font-size: 24px;");
-
-        Label titleLabel = new Label(title);
-        titleLabel.getStyleClass().add("stat-title");
-
-        header.getChildren().addAll(iconLabel, titleLabel);
-
-        Label valueLabel = new Label(value);
-        valueLabel.getStyleClass().add("stat-value");
-        valueLabel.setStyle("-fx-text-fill: " + color + ";");
-
-        card.getChildren().addAll(header, valueLabel);
-        return card;
+        return UIHelper.createStatCard(title, value, icon, color, "citizen-stat-card");
     }
 
     private VBox createQuickActionsSection() {
@@ -1817,29 +1788,11 @@ public class CitizenDashboardController {
     // =====================================================
 
     private void showAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(message);
-
-        // Style the dialog
-        alert.getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
-        alert.getDialogPane().getStyleClass().add("alert-dialog");
-
-        alert.showAndWait();
+        UIHelper.showAlert(title, message);
     }
 
     private void showSuccessMessage(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText("✅ " + title);
-        alert.setContentText(message);
-
-        // Style the dialog
-        alert.getDialogPane().getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
-        alert.getDialogPane().getStyleClass().add("success-dialog");
-
-        alert.showAndWait();
+        UIHelper.showSuccessAlert(title, message);
     }
 
     public Parent getRoot() {
