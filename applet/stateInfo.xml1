@@ -5,9 +5,9 @@
 </PkgNodes>
 </ExpandNodes>
 <FileNodes>
-<fnode>
+<ActiveFile>
 <fileName>src\citizen_applet\citizen_applet.java</fileName>
-<line>23</line>
-</fnode>
+<line>47</line>
+</ActiveFile>
 </FileNodes>
 </StateInfo>

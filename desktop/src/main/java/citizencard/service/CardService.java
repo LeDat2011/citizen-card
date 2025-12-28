@@ -25,6 +25,7 @@ public class CardService {
     private static final byte INS_CREATE = (byte) 0x01;
     private static final byte INS_GET = (byte) 0x02;
     private static final byte INS_UPDATE = (byte) 0x03;
+    private static final byte INS_GET_AVATAR_CHUNK = (byte) 0x04; // For chunked avatar download
     private static final byte INS_RESET_TRY_PIN = (byte) 0x10;
     private static final byte INS_CLEAR_CARD = (byte) 0x11;
 
@@ -843,12 +844,16 @@ public class CardService {
         }
 
         try {
-            System.out.println("[PHOTO] Uploading avatar with chunked transfer: " + avatarData.length + " bytes");
+            System.out.println("============================================================");
+            System.out.println("[AVATAR UPLOAD] Starting chunked transfer...");
+            System.out.println("  Total size: " + avatarData.length + " bytes");
+            System.out.println("============================================================");
 
             // Use chunked transfer (max 200 bytes per chunk)
             final int CHUNK_SIZE = 200;
             int offset = 0;
             int chunkNum = 0;
+            int totalChunks = (avatarData.length + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
             while (offset < avatarData.length) {
                 int remaining = avatarData.length - offset;
@@ -870,30 +875,57 @@ public class CardService {
                 // P2: bit 7 = 1 if more chunks coming
                 byte p2 = isLastChunk ? P2_AVATAR : (byte) (P2_AVATAR | 0x80);
 
+                System.out.println("------------------------------------------------------------");
+                System.out.println("[AVATAR] Sending chunk #" + (chunkNum + 1) + "/" + totalChunks);
+                System.out.println("[AVATAR] -> INS: 0x01 (CREATE)");
+                System.out.println("[AVATAR] -> P1: 0x05 (CITIZEN_INFO)");
+                System.out.println("[AVATAR] -> P2: 0x" + String.format("%02X", p2 & 0xFF) +
+                        (isLastChunk ? " (AVATAR - LAST CHUNK)" : " (AVATAR | 0x80 - MORE CHUNKS)"));
+                System.out.println("[AVATAR] -> Chunk header: totalLen=" + avatarData.length + ", offset=" + offset);
+                System.out.println("[AVATAR] -> Chunk data size: " + chunkLen + " bytes");
+
                 byte[] response = sendCommand(INS_CREATE, P1_CITIZEN_INFO, p2, chunk);
 
                 if (!isSuccess(response)) {
-                    System.err.println("[PHOTO] Chunk " + (chunkNum + 1) + " upload failed");
+                    int sw = ((response[response.length - 2] & 0xFF) << 8) | (response[response.length - 1] & 0xFF);
+                    System.err.println("[AVATAR] <- SW: 0x" + String.format("%04X", sw) + " (FAILED)");
+                    System.err.println("[AVATAR] Chunk " + (chunkNum + 1) + " upload failed!");
                     return false;
+                }
+
+                byte[] responseData = getResponseData(response);
+                System.out.println("[AVATAR] <- SW: 0x9000 (SUCCESS)");
+                if (responseData.length > 0) {
+                    System.out.println("[AVATAR] <- Response data: " + responseData.length + " bytes");
                 }
 
                 offset += chunkLen;
                 chunkNum++;
-                System.out.println("[PHOTO] Chunk " + chunkNum + " uploaded (" + chunkLen + " bytes)");
+
+                int progress = (offset * 100) / avatarData.length;
+                System.out.println(
+                        "[AVATAR] Progress: " + offset + "/" + avatarData.length + " bytes (" + progress + "%)");
             }
 
-            System.out.println("[PHOTO] Upload successful! " + chunkNum + " chunks, " + avatarData.length + " bytes");
+            System.out.println("============================================================");
+            System.out.println("[AVATAR UPLOAD] Summary:");
+            System.out.println("  Total chunks sent: " + chunkNum);
+            System.out.println("  Total bytes uploaded: " + avatarData.length);
+            System.out.println("  Status: SUCCESS");
+            System.out.println("============================================================");
             return true;
 
         } catch (Exception e) {
-            System.err.println("[PHOTO] Upload failed: " + e.getMessage());
+            System.err.println("[AVATAR] Upload failed: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
 
     /**
-     * Download avatar from card using chunked transfer (like KMPSmartCard)
-     * P1|P2 = offset, returns up to 240 bytes per call
+     * Download avatar from card using chunked transfer
+     * Uses INS_GET_AVATAR_CHUNK (0x04) with P1|P2 = offset
+     * Response format: [totalLen:2][chunkLen:2][data:N]
      * 
      * @return Avatar bytes or null if no avatar
      */
@@ -903,79 +935,122 @@ public class CardService {
         }
 
         try {
-            System.out.println("[PHOTO] Downloading avatar (Chunked Transfer)...");
+            System.out.println("============================================================");
+            System.out.println("[AVATAR DOWNLOAD] Starting chunked transfer...");
+            System.out.println("============================================================");
+
             ByteArrayOutputStream fullAvatar = new ByteArrayOutputStream();
-            
             int offset = 0;
-            final int MAX_TOTAL = 8192;   // Max avatar size in applet
-            final int MAX_CHUNKS = 50;    // Safety limit
-            
-            for (int i = 0; i < MAX_CHUNKS && offset < MAX_TOTAL; i++) {
+            int totalExpectedSize = 0;
+            final int MAX_CHUNKS = 100; // Safety limit
+
+            for (int chunkNum = 0; chunkNum < MAX_CHUNKS; chunkNum++) {
                 // Calculate P1, P2 from offset
                 byte p1 = (byte) ((offset >> 8) & 0xFF);
                 byte p2 = (byte) (offset & 0xFF);
-                
-                // Send GET command with offset in P1|P2
-                byte[] response = sendCommand(INS_GET, p1, p2, null);
-                
+
+                System.out.println("------------------------------------------------------------");
+                System.out.println("[AVATAR] Requesting chunk #" + chunkNum);
+                System.out.println("[AVATAR] -> INS: 0x04 (GET_AVATAR_CHUNK)");
+                System.out.println("[AVATAR] -> P1|P2 offset: " + offset + " (P1=0x" + String.format("%02X", p1 & 0xFF)
+                        + ", P2=0x" + String.format("%02X", p2 & 0xFF) + ")");
+
+                // Send GET_AVATAR_CHUNK command with offset in P1|P2
+                byte[] response = sendCommand(INS_GET_AVATAR_CHUNK, p1, p2, null);
+
                 if (!isSuccess(response)) {
-                    System.out.println("[PHOTO] GET_AVATAR stopped, SW not 0x9000");
-                    break;
-                }
-                
-                byte[] data = getResponseData(response);
-                
-                System.out.println("[PHOTO] Chunk #" + i + " - offset=" + offset + 
-                        ", received=" + data.length + " bytes");
-                
-                // If empty response and offset=0, no avatar on card
-                if (data.length == 0) {
+                    int sw = ((response[response.length - 2] & 0xFF) << 8) | (response[response.length - 1] & 0xFF);
+                    System.err.println("[AVATAR] <- SW: 0x" + String.format("%04X", sw) + " (FAILED)");
                     if (offset == 0) {
-                        System.out.println("[PHOTO] No avatar on card");
+                        System.out.println("[AVATAR] No avatar stored on card");
                         return null;
                     }
-                    // End of data
                     break;
                 }
-                
-                fullAvatar.write(data);
-                offset += data.length;
-                
-                // If received less than max chunk size, we're done
-                if (data.length < 240) {
+
+                byte[] data = getResponseData(response);
+                System.out.println("[AVATAR] <- Response length: " + data.length + " bytes");
+
+                // Parse response: [totalLen:2][chunkLen:2][data:N]
+                if (data.length < 4) {
+                    System.err.println("[AVATAR] Invalid response - too short");
+                    break;
+                }
+
+                int totalLen = ((data[0] & 0xFF) << 8) | (data[1] & 0xFF);
+                int chunkLen = ((data[2] & 0xFF) << 8) | (data[3] & 0xFF);
+
+                System.out.println("[AVATAR] <- totalLen: " + totalLen + " bytes");
+                System.out.println("[AVATAR] <- chunkLen: " + chunkLen + " bytes");
+
+                // Store expected size on first chunk
+                if (chunkNum == 0) {
+                    totalExpectedSize = totalLen;
+                    System.out.println("[AVATAR] Total avatar size: " + totalExpectedSize + " bytes");
+                }
+
+                // Check if we're done (chunkLen == 0)
+                if (chunkLen == 0) {
+                    System.out.println("[AVATAR] End of data reached");
+                    break;
+                }
+
+                // Validate chunk data
+                if (data.length < 4 + chunkLen) {
+                    System.err.println(
+                            "[AVATAR] Chunk data incomplete: expected " + chunkLen + ", got " + (data.length - 4));
+                    break;
+                }
+
+                // Extract chunk data (skip 4-byte header)
+                fullAvatar.write(data, 4, chunkLen);
+                offset += chunkLen;
+
+                System.out.println("[AVATAR] Progress: " + offset + "/" + totalExpectedSize + " bytes (" +
+                        (totalExpectedSize > 0 ? (offset * 100 / totalExpectedSize) : 0) + "%)");
+
+                // Check if download complete
+                if (offset >= totalExpectedSize) {
+                    System.out.println("[AVATAR] Download complete!");
                     break;
                 }
             }
-            
+
             byte[] photoData = fullAvatar.toByteArray();
-            
+
+            System.out.println("============================================================");
+            System.out.println("[AVATAR DOWNLOAD] Summary:");
+            System.out.println("  Total bytes received: " + photoData.length);
+            System.out.println("  Expected size: " + totalExpectedSize);
+
             if (photoData.length == 0) {
-                System.out.println("[PHOTO] No avatar data received");
+                System.out.println("[AVATAR] No avatar data received");
+                System.out.println("============================================================");
                 return null;
             }
-            
-            System.out.println("[PHOTO] Download successful! Total: " + photoData.length + " bytes");
-            
+
             // Debug: show first bytes to verify JPEG header
-            StringBuilder firstBytes = new StringBuilder("[PHOTO] First 16 bytes: ");
+            StringBuilder firstBytes = new StringBuilder("  First 16 bytes: ");
             for (int i = 0; i < Math.min(16, photoData.length); i++) {
                 firstBytes.append(String.format("%02X ", photoData[i] & 0xFF));
             }
             System.out.println(firstBytes.toString());
-            
+
             // JPEG should start with FF D8 FF
             if (photoData.length >= 2 &&
                     (photoData[0] & 0xFF) == 0xFF &&
                     (photoData[1] & 0xFF) == 0xD8) {
-                System.out.println("[PHOTO] Valid JPEG header detected!");
+                System.out.println("  Format: Valid JPEG header detected!");
             } else {
-                System.err.println("[PHOTO] WARNING: Data does not have JPEG header!");
+                System.err.println("  WARNING: Data does not have JPEG header!");
             }
-            
+            System.out.println("============================================================");
+
             return photoData;
 
         } catch (Exception e) {
-            System.err.println("[PHOTO] Download failed: " + e.getMessage());
+            System.err.println("[AVATAR] Download failed: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }

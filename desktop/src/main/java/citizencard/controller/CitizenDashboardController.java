@@ -554,7 +554,7 @@ public class CitizenDashboardController {
     }
 
     /**
-     * Create avatar display - shows full image without circular clip for debugging
+     * Create avatar display - circular avatar image properly clipped and centered
      * 
      * @param size diameter of the avatar circle
      */
@@ -572,23 +572,55 @@ public class CitizenDashboardController {
                         : "NULL"));
 
         if (avatarImage != null && !avatarImage.isError()) {
-            // Display actual avatar from card - NO CLIP for debugging
+            // Display actual avatar from card with circular clip
             ImageView imageView = new ImageView(avatarImage);
+
+            double imgWidth = avatarImage.getWidth();
+            double imgHeight = avatarImage.getHeight();
+
+            // Use viewport to crop image from center (for cover-like behavior)
+            if (imgWidth > 0 && imgHeight > 0) {
+                double aspectRatio = imgWidth / imgHeight;
+                double viewportWidth, viewportHeight, viewportX, viewportY;
+
+                if (aspectRatio > 1) {
+                    // Image is wider than tall - crop sides
+                    viewportHeight = imgHeight;
+                    viewportWidth = imgHeight; // Make it square
+                    viewportX = (imgWidth - viewportWidth) / 2;
+                    viewportY = 0;
+                } else {
+                    // Image is taller than wide - crop top/bottom
+                    viewportWidth = imgWidth;
+                    viewportHeight = imgWidth; // Make it square
+                    viewportX = 0;
+                    viewportY = (imgHeight - viewportHeight) / 2;
+                }
+
+                imageView.setViewport(
+                        new javafx.geometry.Rectangle2D(viewportX, viewportY, viewportWidth, viewportHeight));
+            }
+
+            // Set fixed size
             imageView.setFitWidth(size);
             imageView.setFitHeight(size);
-            imageView.setPreserveRatio(true); // Keep aspect ratio
+            imageView.setPreserveRatio(false); // We already cropped to square, so stretch to fill
             imageView.setSmooth(true);
 
-            // Background for visibility
+            // Background and border
             container.setStyle(
-                    "-fx-background-color: #ffffff;" +
+                    "-fx-background-color: #f8fafc;" +
                             "-fx-background-radius: " + (size / 2) + "px;" +
                             "-fx-border-color: #22c55e;" +
                             "-fx-border-width: 3px;" +
                             "-fx-border-radius: " + (size / 2) + "px;");
 
+            // Clip the container itself to make it circular
+            javafx.scene.shape.Circle containerClip = new javafx.scene.shape.Circle(size / 2, size / 2, size / 2);
+            container.setClip(containerClip);
+
             container.getChildren().add(imageView);
-            System.out.println("[AVATAR] ImageView added to container");
+            System.out.println("[AVATAR] ImageView added with viewport crop and container clip");
         } else {
             // Default placeholder avatar
             String reason = avatarImage == null ? "null" : "error: " + avatarImage.getException();
@@ -641,16 +673,26 @@ public class CitizenDashboardController {
         System.out.println("[INFO] Refreshing card data...");
 
         try {
-            // Reload all data from card
+            // Reload all data from card (including avatar)
             loadDataFromCard();
 
-            // Update UI
+            // Rebuild sidebar to update avatar (don't create new root)
+            VBox newSidebar = createSidebar();
+            root.setLeft(newSidebar);
+
+            // Update balance display
             updateBalanceDisplay();
-            showSuccessMessage("Làm mới thành công", "Thông tin thẻ đã được cập nhật từ thẻ thông minh.");
-            showCardInfo(); // Refresh the display
+
+            // Show card info page
+            showCardInfo();
+
+            showSuccessMessage("Làm mới thành công",
+                    "✅ Thông tin thẻ đã được cập nhật từ thẻ thông minh.\n\n" +
+                            "Ảnh đại diện và thông tin cá nhân đã được làm mới.");
 
         } catch (Exception e) {
             showAlert("Lỗi làm mới", "Không thể làm mới thông tin thẻ: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -1070,51 +1112,13 @@ public class CitizenDashboardController {
         Label infoLabel = new Label("⚠️ Mọi thay đổi đều yêu cầu xác thực mã PIN để đảm bảo an toàn.");
         infoLabel.setStyle("-fx-text-fill: #dc2626; -fx-font-size: 14px; -fx-padding: 10px 0;");
 
-        // Avatar edit section
-        VBox avatarSection = createAvatarEditSection();
-
         // Email edit section
         VBox emailSection = createEmailEditSection();
 
         // Phone edit section
         VBox phoneSection = createPhoneEditSection();
 
-        contentArea.getChildren().addAll(pageTitle, infoLabel, avatarSection, emailSection, phoneSection);
-    }
-
-    private VBox createAvatarEditSection() {
-        VBox section = new VBox(10);
-        section.setPadding(new Insets(20));
-        section.setStyle("-fx-background-color: white; -fx-background-radius: 10px;");
-
-        Label sectionTitle = new Label("📷 Ảnh đại diện");
-        sectionTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-
-        HBox avatarRow = new HBox(20);
-        avatarRow.setAlignment(Pos.CENTER_LEFT);
-
-        // Current avatar preview
-        Label currentAvatar = new Label("👤");
-        currentAvatar.setStyle(
-                "-fx-font-size: 48px; -fx-background-color: #e5e7eb; -fx-background-radius: 50%; -fx-padding: 10px;");
-
-        if (avatarImage != null) {
-            ImageView avatarView = new ImageView(avatarImage);
-            avatarView.setFitWidth(80);
-            avatarView.setFitHeight(80);
-            avatarView.setPreserveRatio(true);
-            avatarRow.getChildren().add(avatarView);
-        } else {
-            avatarRow.getChildren().add(currentAvatar);
-        }
-
-        Button changeAvatarBtn = new Button("📁 Chọn ảnh mới");
-        changeAvatarBtn.getStyleClass().addAll("btn", "btn-secondary");
-        changeAvatarBtn.setOnAction(e -> changeAvatar());
-
-        avatarRow.getChildren().add(changeAvatarBtn);
-        section.getChildren().addAll(sectionTitle, avatarRow);
-        return section;
+        contentArea.getChildren().addAll(pageTitle, infoLabel, emailSection, phoneSection);
     }
 
     private VBox createEmailEditSection() {
@@ -1163,77 +1167,6 @@ public class CitizenDashboardController {
         phoneRow.getChildren().addAll(phoneField, savePhoneBtn);
         section.getChildren().addAll(sectionTitle, phoneRow);
         return section;
-    }
-
-    private void changeAvatar() {
-        // Require PIN verification first
-        String pin = PinInputDialog.showPinDialog(
-                "Xác thực PIN",
-                "🔐 Nhập mã PIN để thay đổi ảnh đại diện");
-
-        if (pin == null || pin.isEmpty()) {
-            return;
-        }
-
-        CardService.PinVerificationResult pinResult = cardService.verifyPin(pin);
-        if (!pinResult.success) {
-            showPinError(pinResult);
-            return;
-        }
-
-        // Open file chooser
-        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-        fileChooser.setTitle("Chọn ảnh đại diện");
-        fileChooser.getExtensionFilters().addAll(
-                new javafx.stage.FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif",
-                        "*.webp"));
-
-        java.io.File selectedFile = fileChooser.showOpenDialog(root.getScene().getWindow());
-        if (selectedFile != null) {
-            try {
-                // Check file size (max 15KB for smart card)
-                long fileSize = selectedFile.length();
-                if (fileSize > 15 * 1024) {
-                    showAlert("Ảnh quá lớn",
-                            "Kích thước ảnh tối đa là 15KB.\n" +
-                                    "Kích thước ảnh đã chọn: " + (fileSize / 1024) + "KB\n\n" +
-                                    "Vui lòng chọn ảnh nhỏ hơn hoặc nén ảnh trước.");
-                    return;
-                }
-
-                // Read image
-                byte[] imageData = java.nio.file.Files.readAllBytes(selectedFile.toPath());
-
-                // Upload to card with progress indicator
-                showAlert("Đang tải ảnh", "Vui lòng chờ trong giây lát...");
-
-                boolean success = false;
-                try {
-                    success = cardService.uploadAvatar(imageData);
-                } catch (RuntimeException e) {
-                    showAlert("Lỗi thẻ",
-                            "Thẻ thông minh không hỗ trợ chức năng này.\n\n" +
-                                    "Lỗi: " + e.getMessage() + "\n\n" +
-                                    "Vui lòng kiểm tra applet đã được nạp đúng phiên bản.");
-                    return;
-                }
-
-                if (success) {
-                    // Reload avatar
-                    avatarImage = new javafx.scene.image.Image(new java.io.ByteArrayInputStream(imageData));
-                    showSuccessMessage("Thành công", "Đã cập nhật ảnh đại diện!");
-                    showEditProfile(); // Refresh
-                } else {
-                    showAlert("Lỗi",
-                            "Không thể cập nhật ảnh đại diện.\n\n" +
-                                    "Có thể thẻ chưa được khởi tạo hoặc applet không hỗ trợ.");
-                }
-            } catch (java.io.IOException e) {
-                showAlert("Lỗi", "Không thể đọc file ảnh: " + e.getMessage());
-            } catch (Exception e) {
-                showAlert("Lỗi", "Lỗi không xác định: " + e.getMessage());
-            }
-        }
     }
 
     private void changeEmail(String newEmail) {
