@@ -15,6 +15,30 @@
 
 ---
 
+## 🔑 Tóm Tắt Kiến Trúc Khóa
+
+**1. PIN Key (Khóa bảo vệ):**
+- Được sinh ra từ mã PIN của cư dân thông qua hàm PBKDF2-HMAC-SHA1
+- Sử dụng để mã hóa (wrap) Master Key
+- Mục đích: Chỉ để bảo vệ Master Key khi lưu trữ trên thẻ
+
+**2. Master Key (Khóa dữ liệu):**
+- Là một khóa AES-128 ngẫu nhiên, được sinh ra duy nhất một lần khi khởi tạo thẻ
+- Được lưu trên thẻ dưới dạng **đã mã hóa** bởi PIN Key
+- Khi sử dụng (sau khi Verify PIN xong), Master Key được giải mã và nạp vào RAM
+- Sử dụng trực tiếp: Master Key này dùng để mã hóa/giải mã các trường như `Balance`, `Info`, `Avatar`...
+
+**3. RSA Key Pair (Khóa xác thực):**
+- Private Key lưu trên thẻ, không bao giờ export
+- Public Key gửi về database khi đăng ký
+- Dùng cho chữ ký số xác thực thẻ không bị giả mạo
+
+**Sơ đồ tóm tắt:**
+
+> `Mã PIN` → *(sinh ra)* → `PIN Key` → *(mã hóa/giải mã)* → `Master Key` → *(mã hóa/giải mã)* → `Dữ liệu thẻ`
+
+---
+
 ## 🎤 Giải Thích Cơ Chế Mã Hóa (Dành Cho Thuyết Trình)
 
 Hệ thống sử dụng **3 cơ chế mã hóa chính**: PBKDF2-HMAC-SHA1 để sinh khóa từ PIN, AES-128 để mã hóa dữ liệu, và RSA-1024 để tạo chữ ký số xác thực thẻ.
