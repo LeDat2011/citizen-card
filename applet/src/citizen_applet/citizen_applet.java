@@ -6,10 +6,12 @@ import javacardx.crypto.*;
 import javacardx.apdu.ExtendedLength;
 
 /**
- * FULL CITIZEN CARD APPLET v2.0
+ * FULL CITIZEN CARD APPLET v3.0
  * 
  * Features:
- * - PIN verification with MD5 hash
+ * - PIN Key + Master Key architecture for enhanced security
+ * - PIN Key derived from PBKDF2(PIN, salt) ON APPLET
+ * - Master Key (random AES-128) encrypts all user data
  * - AES-128 encryption for personal info and avatar
  * - RSA-1024 digital signature
  * - Extended APDU support for large avatar (up to 15KB)
@@ -57,6 +59,12 @@ public class citizen_applet extends Applet implements ExtendedLength {
     private static final short MAX_INFO_LENGTH = 512;
     private static final short MAX_AVATAR_SIZE = (short) 15360; // 15KB with Extended APDU
 
+    // PBKDF2 Configuration
+    private static final short PBKDF2_ITERATIONS = 1000; // Reduced for JavaCard performance
+    private static final short PBKDF2_KEY_LENGTH = 16; // 128-bit AES key
+    private static final short SHA1_BLOCK_SIZE = 64;
+    private static final short SHA1_HASH_SIZE = 20;
+
     // =====================================================
     // STORAGE
     // =====================================================
@@ -71,10 +79,19 @@ public class citizen_applet extends Applet implements ExtendedLength {
     private boolean cardInitialized;
     private boolean cardActive;
 
-    // Crypto components
-    private AESKey aesKey;
+    // Crypto components - New Master Key Architecture
+    private AESKey pinKey; // Key sinh từ PBKDF2(PIN), dùng wrap/unwrap Master Key
+    private AESKey masterKey; // Key ngẫu nhiên, dùng mã hóa dữ liệu thực tế
+    private byte[] encryptedMasterKey; // Master Key đã được mã hóa bằng PIN Key (16 bytes)
     private Cipher aesCipher;
     private MessageDigest md5;
+    private MessageDigest sha1; // For PBKDF2-HMAC-SHA1
+    private RandomData randomData; // Dùng sinh Master Key ngẫu nhiên
+
+    // PBKDF2 working buffers
+    private byte[] hmacKey; // HMAC key buffer (64 bytes for SHA1 block)
+    private byte[] hmacBuffer; // HMAC intermediate buffer
+    private byte[] pbkdf2Buffer; // PBKDF2 output buffer
 
     // RSA components
     private RSAPrivateKey rsaPrivateKey;
@@ -115,18 +132,28 @@ public class citizen_applet extends Applet implements ExtendedLength {
         createDate = new byte[10];
         encryptedBalance = new byte[16];
         encryptedInfo = new byte[(short) (MAX_INFO_LENGTH + 16)];
-        encryptedInfo = new byte[(short) (MAX_INFO_LENGTH + 16)];
         tempBuffer = new byte[528]; // Increased to support Info re-encryption (512 + padding)
         tempBalance = new byte[16];
+
+        // Master Key storage (encrypted by PIN Key)
+        encryptedMasterKey = new byte[16];
+
+        // PBKDF2 working buffers
+        hmacKey = new byte[SHA1_BLOCK_SIZE]; // 64 bytes
+        hmacBuffer = new byte[(short) (SHA1_BLOCK_SIZE + SHA1_HASH_SIZE)]; // 84 bytes
+        pbkdf2Buffer = new byte[SHA1_HASH_SIZE]; // 20 bytes
 
         // Avatar storage (add 16 bytes for AES padding)
         avatar = new byte[(short) (MAX_AVATAR_SIZE + 16)];
         avatarBuffer = new byte[(short) (MAX_AVATAR_SIZE + 16)];
 
-        // Crypto initialization
+        // Crypto initialization - New Master Key Architecture
         md5 = MessageDigest.getInstance(MessageDigest.ALG_MD5, false);
-        aesKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
+        sha1 = MessageDigest.getInstance(MessageDigest.ALG_SHA, false);
+        pinKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
+        masterKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
         aesCipher = Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_ECB_NOPAD, false);
+        randomData = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
 
         // RSA initialization
         rsaSignature = Signature.getInstance(Signature.ALG_RSA_SHA_PKCS1, false);
@@ -217,26 +244,37 @@ public class citizen_applet extends Applet implements ExtendedLength {
         byte[] buffer = apdu.getBuffer();
         short lc = apdu.setIncomingAndReceive();
 
+        // FORMAT v3.0: Receive PIN (4 bytes), PBKDF2 done ON APPLET
         if (lc != PIN_LENGTH) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
 
-        // Hash input PIN with MD5
-        md5.reset();
-        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, tempBuffer, (short) 0);
+        // Derive PIN Key from received PIN using PBKDF2
+        derivePinKey(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, tempBuffer, (short) 0);
 
-        // Compare with stored hash
+        // Compare derived PIN Key with stored PIN Key
         if (Util.arrayCompare(pin, (short) 0, tempBuffer, (short) 0, (short) 16) == 0) {
             pinVerified = true;
             pinTryCounter = MAX_PIN_TRIES;
 
-            // Regenerate AES key from PIN hash
-            aesKey.setKey(pin, (short) 0);
+            // Set PIN Key
+            pinKey.setKey(tempBuffer, (short) 0);
+
+            // === Decrypt Master Key using PIN Key ===
+            aesCipher.init(pinKey, Cipher.MODE_DECRYPT);
+            aesCipher.doFinal(encryptedMasterKey, (short) 0, (short) 16, tempBuffer, (short) 0);
+            masterKey.setKey(tempBuffer, (short) 0);
+
+            // Clear temp buffer for security
+            Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
 
             buffer[0] = (byte) 0x01; // Success
             buffer[1] = pinTryCounter;
             apdu.setOutgoingAndSend((short) 0, (short) 2);
         } else {
+            // Clear temp buffer for security
+            Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
+
             pinTryCounter--;
             pinVerified = false;
             buffer[0] = (byte) 0x00; // Failure
@@ -278,13 +316,13 @@ public class citizen_applet extends Applet implements ExtendedLength {
         byte[] buffer = apdu.getBuffer();
         short lc = apdu.setIncomingAndReceive();
 
-        // Expected format: [PIN:4][cardIdLength:1][cardId:N]
-        // Minimum: 4 bytes PIN + 1 byte length
+        // FORMAT v3.0: [PIN:4][cardIdLength:1][cardId:N]
+        // PIN is 4 bytes, PBKDF2 is done ON APPLET
         if (lc < (short) (PIN_LENGTH + 1)) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
 
-        // Get Card ID length and data from APDU
+        // Get Card ID length and data from APDU (MUST do this FIRST for PBKDF2 salt)
         short idLen = (short) (buffer[(short) (ISO7816.OFFSET_CDATA + PIN_LENGTH)] & 0xFF);
         if (idLen > 50 || idLen < 1) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
@@ -294,16 +332,27 @@ public class citizen_applet extends Applet implements ExtendedLength {
         Util.arrayCopy(buffer, (short) (ISO7816.OFFSET_CDATA + PIN_LENGTH + 1), cardId, (short) 0, idLen);
         cardIdLength = idLen;
 
-        // Hash PIN with MD5
-        md5.reset();
-        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, pin, (short) 0);
+        // === PBKDF2 ON APPLET: Derive PIN Key from PIN ===
+        // Uses cardId as salt for uniqueness per card
+        derivePinKey(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, pin, (short) 0);
 
-        // Create AES key from PIN hash
-        aesKey.setKey(pin, (short) 0);
+        // Set PIN Key from PBKDF2-derived key
+        pinKey.setKey(pin, (short) 0);
 
-        // Initialize balance to 0 (encrypted)
+        // === Generate random Master Key ===
+        randomData.generateData(tempBuffer, (short) 0, (short) 16);
+        masterKey.setKey(tempBuffer, (short) 0);
+
+        // Encrypt Master Key with PIN Key and store
+        aesCipher.init(pinKey, Cipher.MODE_ENCRYPT);
+        aesCipher.doFinal(tempBuffer, (short) 0, (short) 16, encryptedMasterKey, (short) 0);
+
+        // Clear temp buffer for security
         Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
-        aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
+
+        // Initialize balance to 0 (encrypted with Master Key)
+        Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
+        aesCipher.init(masterKey, Cipher.MODE_ENCRYPT);
         aesCipher.doFinal(tempBuffer, (short) 0, (short) 16, encryptedBalance, (short) 0);
 
         // Activate card
@@ -313,10 +362,7 @@ public class citizen_applet extends Applet implements ExtendedLength {
         pinTryCounter = MAX_PIN_TRIES;
 
         // Return Card ID and Public Key
-        // First copy Card ID
         Util.arrayCopy(cardId, (short) 0, buffer, (short) 0, cardIdLength);
-
-        // Then append serialized public key
         short pubKeyLen = serializePublicKey(buffer, cardIdLength);
 
         apdu.setOutgoingAndSend((short) 0, (short) (cardIdLength + pubKeyLen));
@@ -391,8 +437,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
             // Pad with zeros
             Util.arrayFillNonAtomic(avatarBuffer, totalLen, (short) (paddedLen - totalLen), (byte) 0x00);
 
-            // Encrypt avatar
-            aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
+            // Encrypt avatar with Master Key (v3.0)
+            aesCipher.init(masterKey, Cipher.MODE_ENCRYPT);
             aesCipher.doFinal(avatarBuffer, (short) 0, paddedLen, avatar, (short) 0);
             avatarSize = paddedLen;
 
@@ -468,7 +514,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
         }
 
         byte[] buffer = apdu.getBuffer();
-        aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
+        // Use Master Key for decryption (v3.0)
+        aesCipher.init(masterKey, Cipher.MODE_DECRYPT);
         aesCipher.doFinal(encryptedBalance, (short) 0, (short) 16, buffer, (short) 0);
         apdu.setOutgoingAndSend((short) 0, (short) 4);
     }
@@ -489,7 +536,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
         }
 
         byte[] buffer = apdu.getBuffer();
-        aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
+        // Use Master Key for decryption (v3.0)
+        aesCipher.init(masterKey, Cipher.MODE_DECRYPT);
         short len = aesCipher.doFinal(encryptedInfo, (short) 0, encryptedInfoLength, buffer, (short) 0);
 
         // Remove padding
@@ -518,8 +566,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
             ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
         }
 
-        // Decrypt avatar
-        aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
+        // Decrypt avatar with Master Key (v3.0)
+        aesCipher.init(masterKey, Cipher.MODE_DECRYPT);
         aesCipher.doFinal(avatar, (short) 0, avatarSize, avatarBuffer, (short) 0);
 
         // Get actual length (remove padding)
@@ -557,9 +605,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
         byte p1 = buf[ISO7816.OFFSET_P1];
         byte p2 = buf[ISO7816.OFFSET_P2];
 
-        // Decrypt avatar (optimized: only if needed, but for security we decrypt to
-        // buffer first)
-        aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
+        // Decrypt avatar with Master Key (v3.0)
+        aesCipher.init(masterKey, Cipher.MODE_DECRYPT);
         aesCipher.doFinal(avatar, (short) 0, avatarSize, avatarBuffer, (short) 0);
 
         // Get actual length
@@ -637,49 +684,44 @@ public class citizen_applet extends Applet implements ExtendedLength {
         byte[] buffer = apdu.getBuffer();
         short lc = apdu.setIncomingAndReceive();
 
+        // FORMAT v3.0: [OLD_PIN:4][NEW_PIN:4]
+        // PBKDF2 is done ON APPLET
         if (lc != (short) (PIN_LENGTH * 2)) {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
 
-        // Verify old PIN
-        md5.reset();
-        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, tempBuffer, (short) 0);
-
+        // Derive old PIN Key and verify
+        derivePinKey(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, tempBuffer, (short) 0);
         if (Util.arrayCompare(pin, (short) 0, tempBuffer, (short) 0, (short) 16) != 0) {
+            Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
             ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
         }
 
-        // --- RE-ENCRYPTION START ---
+        // === Only re-encrypt Master Key, NOT all data! ===
 
-        // 1. Decrypt Balance (using OLD key)
-        aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
-        aesCipher.doFinal(encryptedBalance, (short) 0, (short) 16, tempBalance, (short) 0);
+        // 1. Decrypt Master Key with OLD PIN Key
+        aesCipher.init(pinKey, Cipher.MODE_DECRYPT);
+        aesCipher.doFinal(encryptedMasterKey, (short) 0, (short) 16, tempBalance, (short) 0);
 
-        // 2. Decrypt Info (using OLD key) if exists
-        if (encryptedInfoLength > 0) {
-            aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
-            aesCipher.doFinal(encryptedInfo, (short) 0, encryptedInfoLength, tempBuffer, (short) 0);
-        }
+        // 2. Derive new PIN Key from new PIN
+        derivePinKey(buffer, (short) (ISO7816.OFFSET_CDATA + PIN_LENGTH), PIN_LENGTH, pin, (short) 0);
 
-        // 3. Hash new PIN and update AES Key
-        md5.reset();
-        md5.doFinal(buffer, (short) (ISO7816.OFFSET_CDATA + PIN_LENGTH), PIN_LENGTH, pin, (short) 0);
+        // 3. Set new PIN Key
+        pinKey.setKey(pin, (short) 0);
 
-        // Update AES key with new PIN
-        aesKey.setKey(pin, (short) 0);
-        pinTryCounter = MAX_PIN_TRIES; // Reset try counter only after success
+        // 4. Re-encrypt Master Key with NEW PIN Key
+        aesCipher.init(pinKey, Cipher.MODE_ENCRYPT);
+        aesCipher.doFinal(tempBalance, (short) 0, (short) 16, encryptedMasterKey, (short) 0);
 
-        // 4. Re-encrypt Balance (using NEW key)
-        aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
-        aesCipher.doFinal(tempBalance, (short) 0, (short) 16, encryptedBalance, (short) 0);
+        // 5. Clear temp buffers for security
+        Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
+        Util.arrayFillNonAtomic(tempBalance, (short) 0, (short) 16, (byte) 0x00);
 
-        // 5. Re-encrypt Info (using NEW key) if exists
-        if (encryptedInfoLength > 0) {
-            aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
-            aesCipher.doFinal(tempBuffer, (short) 0, encryptedInfoLength, encryptedInfo, (short) 0);
-        }
+        // Reset PIN try counter
+        pinTryCounter = MAX_PIN_TRIES;
 
-        // --- RE-ENCRYPTION END ---
+        // === NO need to re-encrypt Balance, Info, Avatar! ===
+        // They are encrypted with Master Key, which remains the same!
 
         buffer[0] = (byte) 0x01;
         apdu.setOutgoingAndSend((short) 0, (short) 1);
@@ -701,8 +743,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
         short paddedLen = (short) (lc + (16 - (lc % 16)));
         Util.arrayFillNonAtomic(buffer, (short) (ISO7816.OFFSET_CDATA + lc), (short) (paddedLen - lc), (byte) 0x00);
 
-        // Encrypt
-        aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
+        // Encrypt with Master Key (v3.0)
+        aesCipher.init(masterKey, Cipher.MODE_ENCRYPT);
         aesCipher.doFinal(buffer, ISO7816.OFFSET_CDATA, paddedLen, encryptedInfo, (short) 0);
         encryptedInfoLength = paddedLen;
 
@@ -725,8 +767,8 @@ public class citizen_applet extends Applet implements ExtendedLength {
         byte type = buffer[ISO7816.OFFSET_CDATA];
         int amount = getInt(buffer, (short) (ISO7816.OFFSET_CDATA + 1));
 
-        // Decrypt current balance
-        aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
+        // Decrypt current balance with Master Key (v3.0)
+        aesCipher.init(masterKey, Cipher.MODE_DECRYPT);
         aesCipher.doFinal(encryptedBalance, (short) 0, (short) 16, tempBuffer, (short) 0);
         int currentBalance = getInt(tempBuffer, (short) 0);
 
@@ -744,10 +786,10 @@ public class citizen_applet extends Applet implements ExtendedLength {
             return;
         }
 
-        // Encrypt new balance
+        // Encrypt new balance with Master Key (v3.0)
         putInt(tempBuffer, (short) 0, newBalance);
         Util.arrayFillNonAtomic(tempBuffer, (short) 4, (short) 12, (byte) 0x00);
-        aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
+        aesCipher.init(masterKey, Cipher.MODE_ENCRYPT);
         aesCipher.doFinal(tempBuffer, (short) 0, (short) 16, encryptedBalance, (short) 0);
 
         // Return new balance
@@ -930,5 +972,130 @@ public class citizen_applet extends Applet implements ExtendedLength {
             count++;
         }
         return (short) (maxLen - count);
+    }
+
+    // =====================================================
+    // PBKDF2 IMPLEMENTATION (ON-CARD)
+    // =====================================================
+
+    /**
+     * Derive PIN Key from PIN using PBKDF2-HMAC-SHA1
+     * Uses cardId as salt for uniqueness per card
+     * 
+     * @param pinData   PIN bytes (4 bytes)
+     * @param pinOffset Offset in pinData
+     * @param pinLen    Length of PIN
+     * @param output    Output buffer for derived key (16 bytes)
+     * @param outOffset Offset in output buffer
+     */
+    private void derivePinKey(byte[] pinData, short pinOffset, short pinLen,
+            byte[] output, short outOffset) {
+        // Use cardId as salt (ensures unique keys per card)
+        pbkdf2(pinData, pinOffset, pinLen,
+                cardId, (short) 0, cardIdLength,
+                PBKDF2_ITERATIONS,
+                output, outOffset, PBKDF2_KEY_LENGTH);
+    }
+
+    /**
+     * PBKDF2-HMAC-SHA1 implementation for JavaCard
+     * 
+     * @param password   Password bytes
+     * @param passOff    Password offset
+     * @param passLen    Password length
+     * @param salt       Salt bytes
+     * @param saltOff    Salt offset
+     * @param saltLen    Salt length
+     * @param iterations Number of iterations
+     * @param output     Output buffer
+     * @param outOff     Output offset
+     * @param dkLen      Derived key length (must be <= 20 for single block)
+     */
+    private void pbkdf2(byte[] password, short passOff, short passLen,
+            byte[] salt, short saltOff, short saltLen,
+            short iterations,
+            byte[] output, short outOff, short dkLen) {
+
+        // For 16-byte key, we only need one block (SHA1 produces 20 bytes)
+        // Block index = 1 (big-endian 4 bytes)
+
+        // First iteration: U1 = HMAC(password, salt || INT(1))
+        // Prepare salt || INT(1) in hmacBuffer
+        Util.arrayCopy(salt, saltOff, hmacBuffer, (short) 0, saltLen);
+        hmacBuffer[(short) (saltLen)] = 0x00;
+        hmacBuffer[(short) (saltLen + 1)] = 0x00;
+        hmacBuffer[(short) (saltLen + 2)] = 0x00;
+        hmacBuffer[(short) (saltLen + 3)] = 0x01;
+
+        // U1 = HMAC-SHA1(password, salt || 0x00000001)
+        hmacSha1(password, passOff, passLen,
+                hmacBuffer, (short) 0, (short) (saltLen + 4),
+                pbkdf2Buffer, (short) 0);
+
+        // Copy U1 to output (this will be XORed with subsequent U values)
+        Util.arrayCopy(pbkdf2Buffer, (short) 0, output, outOff, dkLen);
+
+        // Subsequent iterations: Ui = HMAC(password, U(i-1)), output ^= Ui
+        for (short i = 1; i < iterations; i++) {
+            // Ui = HMAC-SHA1(password, U(i-1))
+            hmacSha1(password, passOff, passLen,
+                    pbkdf2Buffer, (short) 0, SHA1_HASH_SIZE,
+                    pbkdf2Buffer, (short) 0);
+
+            // XOR with output
+            for (short j = 0; j < dkLen; j++) {
+                output[(short) (outOff + j)] ^= pbkdf2Buffer[j];
+            }
+        }
+    }
+
+    /**
+     * HMAC-SHA1 implementation
+     * HMAC(K, m) = H((K' XOR opad) || H((K' XOR ipad) || m))
+     * 
+     * @param key     HMAC key
+     * @param keyOff  Key offset
+     * @param keyLen  Key length
+     * @param message Message to authenticate
+     * @param msgOff  Message offset
+     * @param msgLen  Message length
+     * @param output  Output buffer (20 bytes)
+     * @param outOff  Output offset
+     */
+    private void hmacSha1(byte[] key, short keyOff, short keyLen,
+            byte[] message, short msgOff, short msgLen,
+            byte[] output, short outOff) {
+
+        // Step 1: Prepare K' (key padded/hashed to block size)
+        if (keyLen > SHA1_BLOCK_SIZE) {
+            // If key > block size, hash it first
+            sha1.reset();
+            sha1.doFinal(key, keyOff, keyLen, hmacKey, (short) 0);
+            Util.arrayFillNonAtomic(hmacKey, SHA1_HASH_SIZE,
+                    (short) (SHA1_BLOCK_SIZE - SHA1_HASH_SIZE), (byte) 0x00);
+        } else {
+            // Pad key with zeros
+            Util.arrayCopy(key, keyOff, hmacKey, (short) 0, keyLen);
+            Util.arrayFillNonAtomic(hmacKey, keyLen,
+                    (short) (SHA1_BLOCK_SIZE - keyLen), (byte) 0x00);
+        }
+
+        // Step 2: Compute inner hash: H((K' XOR ipad) || message)
+        // ipad = 0x36 repeated
+        sha1.reset();
+        for (short i = 0; i < SHA1_BLOCK_SIZE; i++) {
+            hmacBuffer[i] = (byte) (hmacKey[i] ^ 0x36);
+        }
+        sha1.update(hmacBuffer, (short) 0, SHA1_BLOCK_SIZE);
+        sha1.doFinal(message, msgOff, msgLen, hmacBuffer, (short) 0);
+
+        // Step 3: Compute outer hash: H((K' XOR opad) || inner_hash)
+        // opad = 0x5C repeated
+        sha1.reset();
+        for (short i = 0; i < SHA1_BLOCK_SIZE; i++) {
+            hmacBuffer[(short) (SHA1_HASH_SIZE + i)] = (byte) (hmacKey[i] ^ 0x5C);
+        }
+        sha1.update(hmacBuffer, SHA1_HASH_SIZE, SHA1_BLOCK_SIZE);
+        sha1.doFinal(hmacBuffer, (short) 0, SHA1_HASH_SIZE, output, outOff);
     }
 }
