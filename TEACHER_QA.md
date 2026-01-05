@@ -442,3 +442,403 @@ for (int offset = 0; offset < avatarData.length; offset += CHUNK_SIZE) {
 > 📅 **Ngày tạo**: 2026-01-05
 > 
 > 📚 **Tài liệu tham khảo**: `SECURITY_MECHANISM.md`, `ENCRYPTION_GUIDE.md`
+
+---
+
+# 📖 PHẦN MỞ RỘNG - CÂU HỎI TƯƠNG TỰ
+
+---
+
+## Nhóm A: Về Thuật Toán Mã Hóa
+
+### Câu A1: Tại sao dùng AES-128 mà không dùng AES-256?
+
+**Lý do:**
+- JavaCard có **tài nguyên hạn chế** (RAM ~2KB, EEPROM ~32KB)
+- AES-128 đã đủ mạnh (2^128 khả năng = không thể brute-force)
+- AES-256 chậm hơn và tốn RAM hơn
+- JavaCard API chỉ hỗ trợ tốt AES-128
+
+---
+
+### Câu A2: Tại sao dùng ECB mode mà không dùng CBC?
+
+**ECB (Electronic Codebook):**
+- ✅ Đơn giản, không cần IV (Initialization Vector)
+- ✅ Phù hợp cho dữ liệu nhỏ (balance 4 bytes, master key 16 bytes)
+- ⚠️ Nhược điểm: Cùng plaintext → cùng ciphertext
+
+**CBC (Cipher Block Chaining):**
+- Cần quản lý IV → phức tạp hơn
+- Tốn thêm 16 bytes lưu IV
+
+**Kết luận:** ECB chấp nhận được vì dữ liệu mỗi block là unique (balance thay đổi, info khác nhau).
+
+---
+
+### Câu A3: HMAC-SHA1 là gì? Tại sao dùng trong PBKDF2?
+
+**HMAC-SHA1** = Hash-based Message Authentication Code với SHA-1
+
+```
+HMAC(K, m) = SHA1((K ⊕ opad) || SHA1((K ⊕ ipad) || m))
+```
+
+**Vai trò trong PBKDF2:**
+- Là **PRF** (Pseudo-Random Function) được dùng trong từng vòng lặp
+- Đảm bảo output không thể đoán ngược
+- Kết hợp password và salt an toàn
+
+---
+
+### Câu A4: Tại sao RSA-1024 mà không dùng RSA-2048?
+
+| RSA-1024 | RSA-2048 |
+|----------|----------|
+| Key size: 128 bytes | Key size: 256 bytes |
+| Signature: 128 bytes | Signature: 256 bytes |
+| Nhanh hơn trên JavaCard | Chậm gấp 4-8 lần |
+| Đủ an toàn cho smart card | Quá tốn tài nguyên |
+
+**Kết luận:** RSA-1024 là cân bằng giữa bảo mật và hiệu năng trên JavaCard.
+
+---
+
+## Nhóm B: Về APDU Commands
+
+### Câu B1: Cấu trúc APDU Command như thế nào?
+
+```
+┌─────┬─────┬─────┬─────┬─────┬──────────┬─────┐
+│ CLA │ INS │ P1  │ P2  │ Lc  │   Data   │ Le  │
+│ 1B  │ 1B  │ 1B  │ 1B  │ 1B  │  0-255B  │ 1B  │
+└─────┴─────┴─────┴─────┴─────┴──────────┴─────┘
+```
+
+| Field | Mô tả | Giá trị trong project |
+|-------|-------|----------------------|
+| CLA | Class byte | 0x00 |
+| INS | Instruction | 0x01 |
+| P1 | Parameter 1 | Function type |
+| P2 | Parameter 2 | Sub-function |
+| Lc | Data length | Độ dài data |
+| Data | Payload | Dữ liệu gửi đi |
+| Le | Expected length | Độ dài mong đợi |
+
+---
+
+### Câu B2: Các lệnh APDU trong project là gì?
+
+| P1 | Chức năng | Data gửi đi |
+|----|-----------|-------------|
+| 0x01 | VERIFY_PIN | PIN (4 bytes) |
+| 0x02 | UPDATE_BALANCE | Type + Amount |
+| 0x03 | GET_BALANCE | (không có) |
+| 0x04 | UPDATE_INFO | Info data |
+| 0x05 | GET_INFO | (không có) |
+| 0x06 | CREATE_SIGNATURE | Challenge |
+| 0x07 | UPDATE_PIN | OldPIN + NewPIN |
+| 0x08 | CREATE_AVATAR | Chunk data |
+| 0x09 | GET_AVATAR | Offset |
+| 0x0A | CREATE_INIT | PIN + CardID |
+
+---
+
+### Câu B3: Status Word (SW) trả về nghĩa là gì?
+
+| SW | Hex | Ý nghĩa |
+|----|-----|---------|
+| 9000 | OK | Thành công |
+| 6982 | Security | Chưa xác thực PIN |
+| 6985 | Conditions | Điều kiện không thỏa |
+| 6700 | Wrong Length | Độ dài sai |
+| 6A86 | Wrong P1P2 | Tham số sai |
+| 6D00 | INS Not Supported | Lệnh không hỗ trợ |
+
+---
+
+## Nhóm C: Về Bảo Mật
+
+### Câu C1: Làm sao chống brute-force PIN?
+
+**3 lớp bảo vệ:**
+
+1. **PBKDF2 với 1000 iterations:**
+   - Mỗi lần thử PIN tốn ~100ms
+   - Không thể thử nhanh
+
+2. **Giới hạn 5 lần thử:**
+   ```java
+   if (pinTryCounter <= 0) {
+       cardActive = false;  // Khóa thẻ vĩnh viễn
+   }
+   ```
+
+3. **Salt = Card ID:**
+   - Mỗi thẻ có PIN Key khác nhau dù cùng PIN
+   - Rainbow table attack không hiệu quả
+
+---
+
+### Câu C2: Nếu mất thẻ thì dữ liệu có bị lộ không?
+
+**KHÔNG!** Vì:
+
+1. Dữ liệu đều **đã mã hóa AES-128**
+2. Không có PIN → không có PIN Key → không giải mã được Master Key
+3. Sau 5 lần thử sai → thẻ bị khóa vĩnh viễn
+4. Private Key RSA **không thể export** ra ngoài
+
+---
+
+### Câu C3: Làm sao chống thẻ giả mạo?
+
+**Challenge-Response với RSA:**
+
+```
+1. Server sinh random challenge
+2. Gửi challenge → Thẻ
+3. Thẻ ký bằng Private Key → Signature
+4. Server verify bằng Public Key (lưu trong DB)
+5. Nếu verify thất bại → Thẻ giả!
+```
+
+**Tại sao không thể giả mạo:**
+- Private Key sinh và lưu **bên trong chip**
+- Không có API nào để export Private Key
+- Không thể tạo signature hợp lệ mà không có Private Key
+
+---
+
+### Câu C4: Dữ liệu truyền giữa Desktop và Thẻ có mã hóa không?
+
+**Hiện tại: KHÔNG** (plaintext qua APDU)
+
+**Lý do:**
+- Khoảng cách vật lý rất ngắn (thẻ cắm vào reader)
+- Khó bị sniff như network
+- Thẻ đã mã hóa dữ liệu bên trong
+
+**Nếu cần bảo mật hơn:**
+- Có thể thêm Secure Messaging (SM)
+- Mã hóa APDU data bằng session key
+
+---
+
+## Nhóm D: Về Luồng Dữ Liệu
+
+### Câu D1: Thanh toán (Payment) hoạt động như thế nào?
+
+```
+1. User chọn thanh toán, nhập số tiền
+   └─▶ amount = 50000
+
+2. Desktop kiểm tra số dư
+   └─▶ getBalance() → currentBalance
+
+3. Nếu đủ tiền:
+   └─▶ sendAPDU(UPDATE_BALANCE, type=0x02, amount)
+
+4. Applet xử lý:
+   a. Decrypt encryptedBalance → balance
+   b. newBalance = balance - amount
+   c. Kiểm tra newBalance >= 0
+   d. Encrypt newBalance → encryptedBalance
+   e. Return newBalance
+
+5. Desktop cập nhật UI
+```
+
+---
+
+### Câu D2: Avatar lớn 15KB thì truyền như thế nào?
+
+**Chunked Transfer Protocol:**
+
+```java
+// Desktop: Chia avatar thành chunks
+int CHUNK_SIZE = 200;  // ~200 bytes mỗi chunk
+
+for (int offset = 0; offset < avatarBytes.length; offset += CHUNK_SIZE) {
+    byte[] chunk = Arrays.copyOfRange(avatarBytes, offset, 
+                                       Math.min(offset + CHUNK_SIZE, avatarBytes.length));
+    
+    // Gửi APDU với [totalLen:2][offset:2][chunkData]
+    byte[] apdu = buildAvatarAPDU(totalLen, offset, chunk);
+    cardService.sendAPDU(apdu);
+}
+```
+
+**Applet: Nhận và ghép chunks**
+```java
+// Copy chunk vào buffer
+Util.arrayCopy(buffer, dataOffset, avatarBuffer, offset, chunkLen);
+
+// Nếu là chunk cuối → mã hóa toàn bộ
+if (isLastChunk) {
+    aesCipher.doFinal(avatarBuffer, 0, paddedLen, avatar, 0);
+}
+```
+
+---
+
+### Câu D3: Khi đọc thông tin cá nhân thì luồng như thế nào?
+
+```
+Desktop                          Smart Card
+   │                                  │
+   │ 1. GET_INFO APDU                 │
+   │ ────────────────────────────────▶│
+   │                                  │ 2. Check pinVerified
+   │                                  │ 3. AES_DECRYPT(encryptedInfo)
+   │                                  │ 4. Remove padding
+   │                                  │
+   │ 5. Plaintext info (512 bytes)    │
+   │ ◀────────────────────────────────│
+   │                                  │
+   │ 6. Parse JSON, hiển thị UI       │
+```
+
+---
+
+## Nhóm E: Về Implementation
+
+### Câu E1: RandomData sinh Master Key như thế nào?
+
+```java
+// Trên JavaCard
+RandomData randomData = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
+
+// Sinh 16 bytes ngẫu nhiên
+randomData.generateData(tempBuffer, (short)0, (short)16);
+```
+
+**ALG_SECURE_RANDOM:**
+- Sử dụng hardware random number generator
+- Không thể đoán trước (unpredictable)
+- Phù hợp cho sinh khóa mật mã
+
+---
+
+### Câu E2: Transient vs Persistent memory trên JavaCard?
+
+| Transient (RAM) | Persistent (EEPROM) |
+|-----------------|---------------------|
+| Mất khi ngắt điện | Giữ vĩnh viễn |
+| Nhanh | Chậm hơn |
+| ~2KB | ~32KB |
+| `pinVerified`, `tempBuffer` | `encryptedBalance`, `pin` |
+
+```java
+// Transient array - clear khi reset
+tempBuffer = JCSystem.makeTransientByteArray((short)256, JCSystem.CLEAR_ON_RESET);
+
+// Persistent array - lưu trữ lâu dài
+encryptedBalance = new byte[16];
+```
+
+---
+
+### Câu E3: Serialize Info như thế nào?
+
+**Format JSON:**
+```json
+{
+  "fullName": "Nguyen Van A",
+  "dateOfBirth": "1990-01-15",
+  "address": "123 ABC Street",
+  "idNumber": "0123456789"
+}
+```
+
+**Xử lý trên Desktop:**
+```java
+// Serialize
+String json = gson.toJson(citizenInfo);
+byte[] data = json.getBytes(StandardCharsets.UTF_8);
+cardService.updateInfo(data);
+
+// Deserialize
+byte[] data = cardService.getInfo();
+String json = new String(data, StandardCharsets.UTF_8);
+CitizenInfo info = gson.fromJson(json, CitizenInfo.class);
+```
+
+---
+
+## Nhóm F: Câu Hỏi Tình Huống
+
+### Câu F1: Nếu quên PIN thì làm thế nào?
+
+**Không có cách khôi phục!** Vì:
+- PIN không lưu dạng plaintext
+- Không có "Forgot PIN" mechanism
+- Đây là by design để bảo mật
+
+**Giải pháp:**
+- Phải phát hành thẻ mới
+- Admin khởi tạo lại từ đầu
+
+---
+
+### Câu F2: Nếu thẻ bị khóa (5 lần sai) thì sao?
+
+**Thẻ bị khóa vĩnh viễn:**
+```java
+cardActive = false;  // Không thể restore
+```
+
+**Xử lý:**
+- Cần phát hành thẻ mới
+- Dữ liệu cũ mất hoàn toàn (không thể recover)
+
+---
+
+### Câu F3: Điều gì xảy ra nếu ngắt điện giữa chừng khi đổi PIN?
+
+**Transaction Protection:**
+```java
+JCSystem.beginTransaction();
+try {
+    // 1. Giải mã Master Key bằng old PIN Key
+    // 2. Sinh new PIN Key
+    // 3. Mã hóa lại Master Key
+    // 4. Cập nhật pinKey
+    JCSystem.commitTransaction();
+} catch (Exception e) {
+    JCSystem.abortTransaction();  // Rollback về trạng thái cũ
+}
+```
+
+**Kết quả:** Nếu ngắt điện → rollback → dữ liệu không bị corrupt.
+
+---
+
+### Câu F4: Server bị hack, Public Key bị thay đổi thì sao?
+
+**Hậu quả:**
+- Thẻ thật sẽ **không verify được** (signature không khớp với fake public key)
+- Kẻ tấn công **không thể tạo thẻ giả** vì không có Private Key
+
+**Phòng chống:**
+- Backup Public Key
+- Checksum/Hash để detect tampering
+- Audit log cho database changes
+
+---
+
+## 📊 Bảng Tổng Hợp Nhanh
+
+| Thành phần | Thuật toán | Key Size | Mục đích |
+|------------|------------|----------|----------|
+| PIN → PIN Key | PBKDF2-HMAC-SHA1 | 128 bit | Sinh khóa từ mật khẩu |
+| Mã hóa dữ liệu | AES-128 ECB | 128 bit | Mã hóa Balance, Info, Avatar |
+| Mã hóa Master Key | AES-128 ECB | 128 bit | Bảo vệ Master Key |
+| Xác thực thẻ | RSA-1024 | 1024 bit | Chữ ký số |
+| Hash trong PBKDF2 | SHA-1 | 160 bit | PRF function |
+
+---
+
+> 📅 **Cập nhật**: 2026-01-05
+> 
+> 💡 **Tip**: Nắm vững sơ đồ luồng và các con số (1000 iterations, 5 lần thử, 16 bytes key...)
