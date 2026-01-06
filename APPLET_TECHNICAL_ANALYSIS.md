@@ -73,7 +73,7 @@ graph TB
     AC & CC --> CS & DAO
     CS --> APP
     DAO --> H2
-    APP --> AES & RSA & MD5
+    APP --> AES & RSA & PBKDF2
     APP --> PIN & CID & BAL & INFO & AVT & KEYS
 ```
 
@@ -85,13 +85,14 @@ graph TB
 
 | Biến | Kiểu | Kích thước | Mã hóa | Mô tả |
 |------|------|-----------|--------|-------|
-| `pin` | byte[] | 16 bytes | MD5 Hash | Hash của PIN 4 số |
-| `cardId` | byte[] | 50 bytes | Không | ID định danh thẻ |
+| `pin` | byte[] | 16 bytes | PBKDF2 | PIN Key (từ PBKDF2-HMAC-SHA1) |
+| `encryptedMasterKey` | byte[] | 16 bytes | AES-128 | Master Key (encrypted by PIN Key) |
+| `cardId` | byte[] | 50 bytes | Không | ID định danh thẻ (dùng làm salt) |
 | `cardIdLength` | short | 2 bytes | Không | Độ dài thực của ID |
-| `encryptedBalance` | byte[] | 16 bytes | AES-128 | Số dư (4 bytes int + padding) |
-| `encryptedInfo` | byte[] | 528 bytes | AES-128 | Thông tin cá nhân |
-| `avatar` | byte[] | 15,376 bytes | AES-128 | Ảnh đại diện |
-| `rsaPrivateKey` | RSAPrivateKey | 1024 bit | Hardware | Khóa ký số |
+| `encryptedBalance` | byte[] | 16 bytes | AES-128 | Số dư (encrypted by Master Key) |
+| `encryptedInfo` | byte[] | 528 bytes | AES-128 | Thông tin cá nhân (encrypted by Master Key) |
+| `avatar` | byte[] | 15,376 bytes | AES-128 | Ảnh đại diện (encrypted by Master Key) |
+| `rsaPrivateKey` | RSAPrivateKey | 1024 bit | Hardware | Khóa ký số (không export) |
 | `rsaPublicKey` | RSAPublicKey | 1024 bit | Không | Khóa công khai |
 
 ### 3.2 Các Cờ Trạng Thái

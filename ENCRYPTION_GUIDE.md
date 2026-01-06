@@ -45,32 +45,36 @@ graph TB
 
 | Thành phần | Thuật toán | Kích thước Key | Mục đích |
 |------------|------------|----------------|----------|
-| **PIN** | MD5 | 128 bit (16 bytes) | Hash PIN để lưu trữ an toàn |
-| **Balance** | AES-128 ECB | 128 bit (từ MD5 PIN) | Mã hóa số dư |
-| **Info** | AES-128 ECB | 128 bit (từ MD5 PIN) | Mã hóa thông tin cá nhân |
-| **Avatar** | AES-128 ECB | 128 bit (từ MD5 PIN) | Mã hóa ảnh đại diện |
+| **PIN → PIN Key** | PBKDF2-HMAC-SHA1 | 128 bit (16 bytes) | Sinh PIN Key từ PIN (1000 iterations) |
+| **Master Key** | AES-128 | 128 bit (random) | Key ngẫu nhiên - mã hóa dữ liệu |
+| **Balance** | AES-128 ECB | 128 bit (Master Key) | Mã hóa số dư |
+| **Info** | AES-128 ECB | 128 bit (Master Key) | Mã hóa thông tin cá nhân |
+| **Avatar** | AES-128 ECB | 128 bit (Master Key) | Mã hóa ảnh đại diện |
 | **Signature** | RSA-1024 SHA1 | 1024 bit | Chữ ký xác thực thẻ |
+
+> **Lưu ý v3.0**: PIN Key chỉ dùng để mã hóa/giải mã Master Key. Dữ liệu thực tế được mã hóa bằng Master Key.
 
 ---
 
-## 2. MD5 Hash - Xử Lý PIN
+## 2. PBKDF2-HMAC-SHA1 - Sinh PIN Key (v3.0)
 
 ### 2.1 Mục Đích
 
-- **Không lưu PIN dạng plain text**: PIN được hash trước khi lưu
-- **Tạo AES key**: MD5 hash của PIN được dùng làm AES key
+- **Sinh PIN Key từ PIN**: Dùng PBKDF2 với 1000 iterations
+- **Bảo vệ Master Key**: PIN Key chỉ dùng để wrap/unwrap Master Key
+- **Chống brute-force**: 1000 iterations làm chậm tấn công thử PIN
 
 ### 2.2 Cơ Chế Hoạt Động
 
 ```mermaid
 graph LR
-    A[PIN 4 số<br/>VD: 1234] --> B[MD5 Hash]
-    B --> C[16 bytes output<br/>81dc9bdb52d04dc20036dbd8313ed055]
-    C --> D[pin[] array]
-    C --> E[AES Key]
+    A[PIN 4 số<br/>VD: 1234] --> B[PBKDF2-HMAC-SHA1<br/>1000 iterations]
+    C[Card ID<br/>Salt] --> B
+    B --> D[PIN Key<br/>16 bytes]
+    D --> E[Encrypt/Decrypt<br/>Master Key]
     
     style A fill:#ffcdd2
-    style C fill:#c8e6c9
+    style D fill:#c8e6c9
 ```
 
 ### 2.3 Code Implementation (Applet)
@@ -78,24 +82,21 @@ graph LR
 ```java
 // File: citizen_applet.java
 
-// Khởi tạo MD5
-private MessageDigest md5;
-md5 = MessageDigest.getInstance(MessageDigest.ALG_MD5, false);
+// PBKDF2 Configuration
+private static final short PBKDF2_ITERATIONS = 1000;
+private static final short PBKDF2_KEY_LENGTH = 16; // 128-bit AES key
 
-// Hash PIN khi khởi tạo thẻ
-private void initializeCard(APDU apdu) {
-    byte[] buffer = apdu.getBuffer();
-    
-    // Hash PIN với MD5 (4 bytes input -> 16 bytes output)
-    md5.reset();
-    md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, pin, (short) 0);
-    
-    // Tạo AES key từ PIN hash
-    aesKey.setKey(pin, (short) 0);
+// Sinh PIN Key từ PIN
+private void derivePinKey(byte[] pinData, short pinOffset, short pinLen,
+                          byte[] output, short outOffset) {
+    pbkdf2(pinData, pinOffset, pinLen,
+           cardId, (short) 0, cardIdLength,    // salt = cardId
+           PBKDF2_ITERATIONS,                   // 1000 iterations
+           output, outOffset, PBKDF2_KEY_LENGTH);
 }
 ```
 
-### 2.4 Xác Thực PIN
+### 2.4 Xác Thực PIN (v3.0)
 
 ```java
 // File: citizen_applet.java - verifyPin()
@@ -103,18 +104,20 @@ private void initializeCard(APDU apdu) {
 private void verifyPin(APDU apdu) {
     byte[] buffer = apdu.getBuffer();
     
-    // 1. Hash PIN nhập vào
-    md5.reset();
-    md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, tempBuffer, (short) 0);
+    // 1. Derive PIN Key từ PIN bằng PBKDF2
+    derivePinKey(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, tempBuffer, (short) 0);
     
-    // 2. So sánh với PIN đã lưu
+    // 2. So sánh với PIN Key đã lưu
     if (Util.arrayCompare(pin, (short) 0, tempBuffer, (short) 0, (short) 16) == 0) {
         // PIN đúng
         pinVerified = true;
-        pinTryCounter = MAX_PIN_TRIES;  // Reset counter
+        pinTryCounter = MAX_PIN_TRIES;
         
-        // 3. Regenerate AES key từ PIN hash
-        aesKey.setKey(pin, (short) 0);
+        // 3. Set PIN Key và giải mã Master Key
+        pinKey.setKey(tempBuffer, (short) 0);
+        aesCipher.init(pinKey, Cipher.MODE_DECRYPT);
+        aesCipher.doFinal(encryptedMasterKey, (short) 0, (short) 16, tempBuffer, (short) 0);
+        masterKey.setKey(tempBuffer, (short) 0);
     } else {
         // PIN sai
         pinTryCounter--;
