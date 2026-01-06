@@ -310,13 +310,28 @@ public class LoginViewController {
     private void setCitizenMode() {
         isAdminMode = false;
 
-        // Citizen mode - need to check card and verify PIN
+        // Citizen mode - first challenge card, then check registration
         try {
+            // Challenge card to verify authenticity using RSA
+            System.out.println("[INFO] Citizen mode selected, challenging card...");
+            boolean isAuthentic = cardService.challengeCard();
+
+            if (!isAuthentic) {
+                System.out.println("[WARN] Card authentication FAILED");
+                statusLabel.setText("⚠️ CẢNH BÁO: Không thể xác thực thẻ!");
+                showAlert("Thẻ không hợp lệ",
+                        "Không thể xác minh tính xác thực của thẻ này.\n\n" +
+                                "Thẻ có thể chưa được khởi tạo hoặc là bản sao không hợp lệ.\n\n" +
+                                "Vui lòng liên hệ quản trị viên.");
+                return;
+            }
+
+            System.out.println("[INFO] Card authentication PASSED");
             String cardId = cardService.getCardId();
 
             // Check if card is registered
             if (cardDAO.isCardRegistered(cardId)) {
-                statusLabel.setText("Chế độ Cư dân: Thẻ đã được xác thực. Vui lòng nhập mã PIN.");
+                statusLabel.setText("✅ Thẻ đã được xác thực! Vui lòng nhập mã PIN.");
                 showLoginSection();
             } else {
                 statusLabel.setText("⚠️ Thẻ chưa được đăng ký trong hệ thống.");
@@ -426,6 +441,8 @@ public class LoginViewController {
                     loadingIndicator.setVisible(false);
 
                     if (connected) {
+                        System.out.println("[INFO] Manual connect successful");
+
                         // Update UI for successful connection
                         updateConnectionStatus(true);
                         connectButton.setText("✓ Đã kết nối");
@@ -433,8 +450,9 @@ public class LoginViewController {
                         connectButton.getStyleClass().add("btn-success");
                         connectButton.setDisable(true);
 
-                        // Show mode selection after successful connection
-                        statusLabel.setText("✅ Thẻ đã kết nối thành công! Vui lòng chọn chế độ đăng nhập.");
+                        // Show mode selection - RSA challenge will happen when user selects Citizen
+                        // mode
+                        statusLabel.setText("✅ Thẻ đã kết nối! Vui lòng chọn chế độ đăng nhập.");
                         showModeSelection();
 
                     } else {

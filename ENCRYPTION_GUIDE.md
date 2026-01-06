@@ -319,7 +319,16 @@ Kết quả:
 - **Xác thực thẻ**: Chứng minh thẻ là thật (không bị giả mạo)
 - **Challenge-Response**: Server gửi challenge, thẻ ký và trả về
 
-### 4.2 Đặc Điểm Kỹ Thuật
+### 4.2 Hai Chế Độ Xác Thực RSA
+
+| Chế độ | INS | Yêu cầu PIN | Mục đích |
+|--------|-----|-------------|----------|
+| **CREATE_SIGNATURE** | 0x01 (P1=0x06) | ✅ Có | Ký giao dịch sau khi đăng nhập |
+| **CHALLENGE** | **0x12** | ❌ **Không** | **Xác thực thẻ ngay khi cắm vào** |
+
+> **Lưu ý**: Lệnh `INS_CHALLENGE (0x12)` cho phép xác thực thẻ **TRƯỚC KHI** yêu cầu PIN, ngăn chặn việc phishing bằng thẻ giả.
+
+### 4.3 Đặc Điểm Kỹ Thuật
 
 | Thuộc tính | Giá trị |
 |------------|---------|
@@ -330,7 +339,7 @@ Kết quả:
 | **Private Key** | Lưu trên thẻ, không export |
 | **Public Key** | Export được, lưu trong DB |
 
-### 4.3 Quy Trình Challenge-Response
+### 4.4 Quy Trình Challenge-Response
 
 ```mermaid
 sequenceDiagram

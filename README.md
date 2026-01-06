@@ -358,8 +358,10 @@ CLA | INS | P1 | P2 | Lc | Data | Le
 | CREATE | 0x01 | Khởi tạo thẻ/tạo dữ liệu |
 | GET | 0x02 | Đọc dữ liệu |
 | UPDATE | 0x03 | Cập nhật dữ liệu |
+| GET_AVATAR_CHUNK | 0x04 | Đọc avatar theo chunk |
 | RESET_TRY_PIN | 0x10 | Reset số lần thử PIN |
 | CLEAR_CARD | 0x11 | Xóa toàn bộ dữ liệu thẻ |
+| **CHALLENGE** | **0x12** | **RSA challenge không cần PIN** |
 
 ### P1 Parameters
 
@@ -389,6 +391,9 @@ CLA | INS | P1 | P2 | Lc | Data | Le
 # Xác thực PIN
 00 00 04 00 04 31 32 33 34
 
+# RSA Challenge Authentication (không cần PIN)
+00 12 00 00 10 [16 bytes challenge random]
+
 # Đọc số dư
 00 02 00 0C 00
 
@@ -409,29 +414,60 @@ CLA | INS | P1 | P2 | Lc | Data | Le
 ### Kiến trúc Bảo mật v3.0
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   Security Architecture v3.0                 │
-├─────────────────────────────────────────────────────────────┤
-│  User PIN (4 digits)                                         │
-│       │                                                       │
-│       ▼                                                       │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  PBKDF2-HMAC-SHA1 (1000 iterations, cardId as salt) │    │
-│  │  → Thực hiện hoàn toàn trên JavaCard                │    │
-│  └─────────────────────────────────────────────────────┘    │
-│       │                                                       │
-│       ▼                                                       │
-│  ┌──────────────┐      ┌──────────────────────────────┐     │
-│  │   PIN Key    │─────▶│  Encrypt/Decrypt Master Key  │     │
-│  │  (16 bytes)  │      │                              │     │
-│  └──────────────┘      └──────────────────────────────┘     │
-│                              │                               │
-│                              ▼                               │
-│  ┌──────────────┐      ┌──────────────────────────────┐     │
-│  │  Master Key  │─────▶│  Encrypt User Data           │     │
-│  │  (Random)    │      │  (Balance, Info, Avatar)     │     │
-│  └──────────────┘      └──────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        Security Architecture v3.0                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                                │
+│  ╔══════════════════════ RSA CARD AUTHENTICATION ══════════════════════╗     │
+│  ║  (BƯỚC 1: Xác thực thẻ - KHÔNG cần PIN)                              ║     │
+│  ║                                                                       ║     │
+│  ║  Server/Desktop                           Smart Card                  ║     │
+│  ║       │                                        │                      ║     │
+│  ║       │──── Random Challenge (16-64 bytes) ───▶│                      ║     │
+│  ║       │                                        │                      ║     │
+│  ║       │                           ┌────────────┴────────────┐         ║     │
+│  ║       │                           │  RSA Private Key        │         ║     │
+│  ║       │                           │  rsaSignature.sign()    │         ║     │
+│  ║       │                           └────────────┬────────────┘         ║     │
+│  ║       │                                        │                      ║     │
+│  ║       │◀──── Signature (128 bytes) ────────────│                      ║     │
+│  ║       │                                        │                      ║     │
+│  ║  ┌────┴────────────────┐                                              ║     │
+│  ║  │ RSA Public Key (DB) │                                              ║     │
+│  ║  │ verify(sig, pubKey) │                                              ║     │
+│  ║  └─────────┬───────────┘                                              ║     │
+│  ║            │                                                          ║     │
+│  ║            ▼                                                          ║     │
+│  ║      ✓ Thẻ hợp lệ → Tiếp tục BƯỚC 2                                   ║     │
+│  ║      ✗ Thẻ giả → TỪ CHỐI (không yêu cầu PIN)                          ║     │
+│  ╚═══════════════════════════════════════════════════════════════════════╝     │
+│                                      │                                         │
+│                                      ▼                                         │
+│  ╔══════════════════════ PIN AUTHENTICATION ═══════════════════════════╗     │
+│  ║  (BƯỚC 2: Xác thực người dùng - sau khi thẻ đã được verify)          ║     │
+│  ║                                                                       ║     │
+│  ║  User PIN (4 digits)                                                  ║     │
+│  ║       │                                                               ║     │
+│  ║       ▼                                                               ║     │
+│  ║  ┌─────────────────────────────────────────────────────┐             ║     │
+│  ║  │  PBKDF2-HMAC-SHA1 (1000 iterations, cardId as salt) │             ║     │
+│  ║  │  → Thực hiện hoàn toàn trên JavaCard                │             ║     │
+│  ║  └─────────────────────────────────────────────────────┘             ║     │
+│  ║       │                                                               ║     │
+│  ║       ▼                                                               ║     │
+│  ║  ┌──────────────┐      ┌──────────────────────────────┐              ║     │
+│  ║  │   PIN Key    │─────▶│  Encrypt/Decrypt Master Key  │              ║     │
+│  ║  │  (16 bytes)  │      │                              │              ║     │
+│  ║  └──────────────┘      └──────────────────────────────┘              ║     │
+│  ║                              │                                        ║     │
+│  ║                              ▼                                        ║     │
+│  ║  ┌──────────────┐      ┌──────────────────────────────┐              ║     │
+│  ║  │  Master Key  │─────▶│  Encrypt User Data           │              ║     │
+│  ║  │  (Random)    │      │  (Balance, Info, Avatar)     │              ║     │
+│  ║  └──────────────┘      └──────────────────────────────┘              ║     │
+│  ╚═══════════════════════════════════════════════════════════════════════╝     │
+│                                                                                │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Applet Security Features
@@ -443,8 +479,54 @@ CLA | INS | P1 | P2 | Lc | Data | Le
 | **PIN Key** | Chỉ dùng để wrap/unwrap Master Key |
 | **AES-128 ECB** | Mã hóa Balance, Info, Avatar |
 | **RSA-1024** | Chữ ký số cho giao dịch |
+| **RSA Challenge (INS 0x12)** | **Xác thực thẻ không cần PIN trước** |
 | **PIN Tries** | Tối đa 5 lần, sau đó khóa thẻ |
 | **Fast PIN Change** | Chỉ re-encrypt Master Key |
+
+### Luồng RSA Challenge-Response Authentication
+
+```mermaid
+sequenceDiagram
+    participant App as Desktop App
+    participant Card as Smart Card
+    participant DB as Database
+
+    Note over App,Card: === BƯỚC 1: XÁC THỰC THẺ (KHÔNG CẦN PIN) ===
+    
+    App->>Card: SELECT Applet (AID)
+    Card-->>App: 9000 OK
+    
+    App->>Card: GET_CARD_ID (00 02 00 0A)
+    Card-->>App: [cardId] + 9000
+    
+    App->>DB: Lấy Public Key từ cardId
+    DB-->>App: publicKey
+    
+    App->>App: Sinh random challenge (16-32 bytes)
+    
+    App->>Card: CHALLENGE (00 12 00 00 [challenge])
+    Note over Card: Ký challenge bằng Private Key<br/>KHÔNG cần verify PIN!
+    Card-->>App: [signature 128 bytes] + 9000
+    
+    App->>App: RSAUtils.verifySignature(sig, pubKey, challenge)
+    
+    alt Signature VALID ✓
+        Note over App: Thẻ xác thực thành công!
+        Note over App,Card: === BƯỚC 2: XÁC THỰC NGƯỜI DÙNG ===
+        App->>App: Yêu cầu nhập PIN
+        App->>Card: VERIFY_PIN (00 00 04 00 [PIN])
+        Card-->>App: [success][tries] + 9000
+        Note over App,Card: Tiếp tục các thao tác khác...
+    else Signature INVALID ✗
+        Note over App: ⚠️ THẺ GIẢ MẠO!
+        App->>App: Từ chối, không yêu cầu PIN
+    end
+```
+
+**Giải thích luồng:**
+1. **Xác thực thẻ trước**: Sử dụng `INS_CHALLENGE (0x12)` để verify thẻ là thật **TRƯỚC KHI** yêu cầu PIN
+2. **Chống phishing**: Nếu thẻ giả → không có Private Key đúng → signature sai → không yêu cầu nhập PIN
+3. **Bảo vệ PIN**: Ngăn kẻ tấn công dùng thẻ giả để thu thập PIN của người dùng
 
 ### Data Protection
 

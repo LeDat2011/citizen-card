@@ -28,6 +28,7 @@ public class CardService {
     private static final byte INS_GET_AVATAR_CHUNK = (byte) 0x04; // For chunked avatar download
     private static final byte INS_RESET_TRY_PIN = (byte) 0x10;
     private static final byte INS_CLEAR_CARD = (byte) 0x11;
+    private static final byte INS_CHALLENGE = (byte) 0x12; // RSA challenge without PIN
 
     // P1 PARAMETERS (Command Type)
     private static final byte P1_PIN = (byte) 0x04;
@@ -775,8 +776,8 @@ public class CardService {
                 }
             }
 
-            // Send challenge to card for signing
-            byte[] response = sendCommand(INS_CREATE, P1_SIGNATURE, (byte) 0x00, challengeStr.getBytes());
+            // Send challenge to card for signing (uses INS_CHALLENGE - no PIN required)
+            byte[] response = sendCommand(INS_CHALLENGE, (byte) 0x00, (byte) 0x00, challengeStr.getBytes());
 
             if (!isSuccess(response)) {
                 System.err.println("[AUTH] Card did not sign challenge");

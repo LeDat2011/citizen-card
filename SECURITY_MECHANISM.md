@@ -53,9 +53,15 @@ Hệ thống sử dụng **3 cơ chế mã hóa chính**: PBKDF2-HMAC-SHA1 để
 
 **Quá trình đổi PIN**: Applet xác thực PIN cũ, giải mã encryptedMasterKey bằng PIN Key cũ để lấy Master Key plaintext, sinh PIN Key mới từ PIN mới bằng derivePinKey(), mã hóa lại Master Key bằng PIN Key mới và lưu vào encryptedMasterKey. Dữ liệu không cần mã hóa lại vì Master Key không đổi.
 
-**Chữ ký số RSA-1024**: Mỗi thẻ có một cặp khóa RSA-1024 riêng được sinh khi khởi tạo. Private Key được lưu trên thẻ và không bao giờ export ra ngoài. Public Key được gửi về database khi đăng ký thẻ. Khi cần xác thực thẻ, server gửi một challenge ngẫu nhiên, applet ký challenge bằng rsaCipher.doFinal() với Private Key và trả về signature. Server verify signature bằng Public Key để xác nhận đây là thẻ hợp lệ chứ không phải thẻ giả mạo. Chức năng này được triển khai qua lệnh APDU CREATE_SIGNATURE (INS=0x01, P1=0x06).
+**Chữ ký số RSA-1024**: Mỗi thẻ có một cặp khóa RSA-1024 riêng được sinh khi khởi tạo. Private Key được lưu trên thẻ và không bao giờ export ra ngoài. Public Key được gửi về database khi đăng ký thẻ. 
 
-**Khả năng chống tấn công**: Dữ liệu trên thẻ đều mã hóa AES-128 nên không đọc được nếu không có Master Key. Kẻ tấn công không có PIN nên không sinh được PIN Key để giải mã Master Key. Thẻ giới hạn 5 lần thử PIN, mỗi lần phải tính PBKDF2 với 1000 vòng nên mất 100ms, sau 5 lần sai thẻ khóa vĩnh viễn với xác suất đoán đúng 0,05%. PBKDF2 sử dụng Card ID làm salt nên cùng PIN vẫn cho PIN Key khác nhau giữa các thẻ. RSA đảm bảo không thể giả mạo thẻ vì Private Key không bao giờ rời khỏi chip bảo mật.
+**Xác thực RSA có 2 chế độ:**
+1. **CREATE_SIGNATURE (INS=0x01, P1=0x06)**: Ký sau khi đã verify PIN - dùng cho giao dịch
+2. **CHALLENGE (INS=0x12)**: **Xác thực thẻ KHÔNG cần PIN trước** - dùng để verify thẻ là thật ngay khi cắm vào, trước khi yêu cầu PIN
+
+Khi cần xác thực thẻ, server gửi một challenge ngẫu nhiên (1-64 bytes), applet ký challenge bằng rsaSignature.sign() với Private Key và trả về signature (128 bytes). Server verify signature bằng Public Key để xác nhận đây là thẻ hợp lệ chứ không phải thẻ giả mạo.
+
+**Khả năng chống tấn công**: Dữ liệu trên thẻ đều mã hóa AES-128 nên không đọc được nếu không có Master Key. Kẻ tấn công không có PIN nên không sinh được PIN Key để giải mã Master Key. Thẻ giới hạn 5 lần thử PIN, mỗi lần phải tính PBKDF2 với 1000 vòng nên mất 100ms, sau 5 lần sai thẻ khóa vĩnh viễn với xác suất đoán đúng 0,05%. PBKDF2 sử dụng Card ID làm salt nên cùng PIN vẫn cho PIN Key khác nhau giữa các thẻ. RSA đảm bảo không thể giả mạo thẻ vì Private Key không bao giờ rời khỏi chip bảo mật. **Lệnh INS_CHALLENGE cho phép xác thực thẻ trước khi yêu cầu PIN**, ngăn chặn việc phishing bằng thẻ giả.
 
 ---
 

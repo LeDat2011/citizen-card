@@ -34,6 +34,7 @@ public class citizen_applet extends Applet implements ExtendedLength {
     private static final byte INS_GET_AVATAR_CHUNK = (byte) 0x04;
     private static final byte INS_RESET_TRY_PIN = (byte) 0x10;
     private static final byte INS_CLEAR_CARD = (byte) 0x11;
+    private static final byte INS_CHALLENGE = (byte) 0x12; // RSA challenge without PIN
 
     // P1 codes
     private static final byte P1_PIN = (byte) 0x04;
@@ -211,6 +212,9 @@ public class citizen_applet extends Applet implements ExtendedLength {
             case INS_CLEAR_CARD:
                 clearCard(apdu);
                 break;
+            case INS_CHALLENGE:
+                processChallenge(apdu);
+                break;
             default:
                 ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
         }
@@ -386,6 +390,35 @@ public class citizen_applet extends Applet implements ExtendedLength {
         }
 
         // Sign the data with RSA private key
+        rsaSignature.init(rsaPrivateKey, Signature.MODE_SIGN);
+        short sigLen = rsaSignature.sign(buffer, ISO7816.OFFSET_CDATA, lc, signatureBuffer, (short) 0);
+
+        // Return signature
+        Util.arrayCopy(signatureBuffer, (short) 0, buffer, (short) 0, sigLen);
+        apdu.setOutgoingAndSend((short) 0, sigLen);
+    }
+
+    /**
+     * Challenge card to verify authenticity WITHOUT PIN
+     * This allows verification that the card has the correct RSA private key
+     * APDU: 00 12 00 00 [Lc] [challenge data]
+     * Returns: signature bytes (128 bytes for RSA-1024)
+     */
+    private void processChallenge(APDU apdu) {
+        // Only require card to be initialized, NOT PIN verified
+        if (!cardInitialized) {
+            ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+        }
+
+        byte[] buffer = apdu.getBuffer();
+        short lc = apdu.setIncomingAndReceive();
+
+        // Challenge should be reasonable size (1-64 bytes)
+        if (lc == 0 || lc > 64) {
+            ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+        }
+
+        // Sign the challenge with RSA private key (NO PIN required)
         rsaSignature.init(rsaPrivateKey, Signature.MODE_SIGN);
         short sigLen = rsaSignature.sign(buffer, ISO7816.OFFSET_CDATA, lc, signatureBuffer, (short) 0);
 
@@ -799,6 +832,7 @@ public class citizen_applet extends Applet implements ExtendedLength {
 
     /**
      * Admin function: Reset PIN without knowing old PIN
+     * WARNING: This will regenerate Master Key, losing encrypted data!
      */
     private void forgetPin(APDU apdu) {
         byte[] buffer = apdu.getBuffer();
@@ -808,14 +842,35 @@ public class citizen_applet extends Applet implements ExtendedLength {
             ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
         }
 
-        // Hash new PIN
-        md5.reset();
-        md5.doFinal(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, pin, (short) 0);
+        // Derive new PIN Key using PBKDF2 (same as initializeCard)
+        derivePinKey(buffer, ISO7816.OFFSET_CDATA, PIN_LENGTH, pin, (short) 0);
 
-        // Update AES key
-        aesKey.setKey(pin, (short) 0);
+        // Set new PIN Key
+        pinKey.setKey(pin, (short) 0);
+
+        // Generate NEW Master Key (old data will be lost!)
+        randomData.generateData(tempBuffer, (short) 0, (short) 16);
+        masterKey.setKey(tempBuffer, (short) 0);
+
+        // Encrypt Master Key with new PIN Key
+        aesCipher.init(pinKey, Cipher.MODE_ENCRYPT);
+        aesCipher.doFinal(tempBuffer, (short) 0, (short) 16, encryptedMasterKey, (short) 0);
+
+        // Clear temp buffer
+        Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
+
+        // Reset balance to 0 (encrypted with new Master Key)
+        Util.arrayFillNonAtomic(tempBuffer, (short) 0, (short) 16, (byte) 0x00);
+        aesCipher.init(masterKey, Cipher.MODE_ENCRYPT);
+        aesCipher.doFinal(tempBuffer, (short) 0, (short) 16, encryptedBalance, (short) 0);
+
+        // Clear encrypted info and avatar
+        encryptedInfoLength = 0;
+        avatarSize = 0;
+
         pinTryCounter = MAX_PIN_TRIES;
         cardActive = true;
+        pinVerified = true;
 
         buffer[0] = (byte) 0x01;
         apdu.setOutgoingAndSend((short) 0, (short) 1);

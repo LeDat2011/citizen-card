@@ -147,8 +147,10 @@ graph LR
 | INS_CREATE | 0x01 | Tạo mới | Init card, Avatar, Signature |
 | INS_GET | 0x02 | Đọc | Lấy dữ liệu |
 | INS_UPDATE | 0x03 | Cập nhật | Sửa PIN, Info, Balance |
+| INS_GET_AVATAR_CHUNK | 0x04 | Avatar chunk | Đọc avatar theo chunk |
 | INS_RESET_TRY_PIN | 0x10 | Reset | Reset số lần thử PIN |
 | INS_CLEAR_CARD | 0x11 | Xóa | Factory reset |
+| **INS_CHALLENGE** | **0x12** | **RSA Challenge** | **Xác thực thẻ không cần PIN** |
 
 ### 5.2 Mã P1 (Parameter 1 - Command Type)
 
@@ -382,14 +384,16 @@ Total: 2 + 3 + 2 + 128 = 135 bytes
 | **GET_TRY_REMAIN** | 00 | 02 | 00 | 08 | 00 | - | 01 |
 | **GET_INFO** | 00 | 02 | 05 | 07 | 00 | - | 00 |
 | **GET_AVATAR** | 00 | 02 | 05 | 09 | 00 | - | 00 |
+| **GET_AVATAR_CHUNK** | 00 | 04 | xx | xx | 00 | - | N |
 | **UPDATE_PIN** | 00 | 03 | 04 | 00 | 08 | [old:4][new:4] | 01 |
-| **UPDATE_INFO** | 00 | 03 | 05 | 07 | N | [encrypted data] | 01 |
+| **UPDATE_INFO** | 00 | 03 | 05 | 07 | N | [plaintext data] | 01 |
 | **UPDATE_BAL** | 00 | 03 | 05 | 0C | 05 | [type:1][amt:4] | 04 |
 | **FORGET_PIN** | 00 | 03 | 0A | 00 | 04 | [newPIN:4] | 01 |
 | **ACTIVATE** | 00 | 03 | 0B | 00 | 00 | - | 01 |
 | **DEACTIVATE** | 00 | 03 | 0C | 00 | 00 | - | 01 |
 | **RESET_TRIES** | 00 | 10 | 00 | 00 | 00 | - | 01 |
 | **CLEAR_CARD** | 00 | 11 | 00 | 00 | 00 | - | 01 |
+| **CHALLENGE** | 00 | 12 | 00 | 00 | N | [challenge:1-64] | 80 |
 
 ---
 
@@ -504,10 +508,10 @@ CREATE TABLE transaction_logs (
 
 | Cơ chế | Mô tả |
 |--------|-------|
-| **Hash MD5** | PIN không bao giờ lưu dạng plain text |
+| **PBKDF2-HMAC-SHA1** | PIN Key sinh on-card, 1000 iterations |
+| **Master Key** | Key ngẫu nhiên, đổi PIN chỉ re-encrypt Master Key |
 | **Giới hạn thử** | Tối đa 5 lần sai -> Block thẻ |
 | **Session-based** | PIN chỉ valid trong session hiện tại |
-| **Re-encrypt on change** | Đổi PIN = Re-encrypt toàn bộ dữ liệu |
 
 ### 11.2 Bảo Vệ Dữ Liệu
 
@@ -523,6 +527,7 @@ CREATE TABLE transaction_logs (
 |--------|-------|
 | **RSA-1024** | Mỗi thẻ có cặp key riêng |
 | **Challenge-Response** | Server gửi challenge, thẻ ký trả về |
+| **INS_CHALLENGE (0x12)** | **Xác thực thẻ KHÔNG cần PIN trước** |
 | **Private Key bảo vệ** | Không bao giờ export ra ngoài |
 
 ### 11.4 Luồng Bảo Mật

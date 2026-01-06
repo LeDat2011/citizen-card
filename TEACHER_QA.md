@@ -28,6 +28,7 @@
 | **Symmetric** (đối xứng - cùng một key) | **Asymmetric** (bất đối xứng - public/private key) |
 | Thuật toán: PBKDF2-HMAC-SHA1 + AES-128 | Thuật toán: RSA-1024 với SHA1withRSA |
 | Nếu sai 5 lần → thẻ bị khóa | Không giới hạn số lần verify |
+| INS: 0x00 (VERIFY_PIN) | INS: 0x01/P1=0x06 (cần PIN) hoặc **0x12 (không cần PIN)** |
 
 ---
 
@@ -46,11 +47,12 @@
 | Tiêu chí | Xác thực PIN | Xác thực RSA |
 |----------|--------------|--------------|
 | **Hướng xác thực** | User → Thẻ | Thẻ → Server |
-| **Dữ liệu đầu vào** | PIN 4 số | Challenge ngẫu nhiên |
+| **Dữ liệu đầu vào** | PIN 4 số | Challenge ngẫu nhiên (1-64 bytes) |
 | **Kết quả** | `pinVerified = true` | Signature 128 bytes |
 | **Kiểm tra bởi** | Thẻ (on-card) | Server (off-card) |
 | **Sử dụng cho** | Truy cập dữ liệu thẻ | Xác minh thẻ hợp lệ |
 | **Giới hạn** | 5 lần sai → khóa thẻ | Không giới hạn |
+| **APDU** | INS=0x00 (VERIFY) | **INS=0x12 (CHALLENGE - không cần PIN)** |
 
 ---
 
